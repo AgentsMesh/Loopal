@@ -7,6 +7,7 @@ use tracing::warn;
 
 use super::llm_result::LlmStreamResult;
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 use super::turn_context::TurnContext;
 use super::turn_state::TurnState;
 
@@ -182,17 +183,18 @@ impl AgentLoopRunner {
         tool_uses: &[(String, String, serde_json::Value)],
     ) -> Result<()> {
         for (id, name, _) in tool_uses {
-            self.emit_in_turn(AgentEventPayload::ToolResult {
-                id: id.clone(),
-                name: name.clone(),
-                result: "Tool call discarded because the model response was incomplete".into(),
-                is_error: true,
-                duration_ms: None,
-                metadata: Some(ToolResultMetadata::stale(
+            let finalized = PendingToolResult::new(
+                id,
+                name,
+                "Tool call discarded because the model response was incomplete",
+                true,
+                Some(ToolResultMetadata::stale(
                     StaleReason::IncompleteModelResponse,
                 )),
-            })
+            )
+            .finalize(self)
             .await?;
+            self.emit_in_turn(finalized.event).await?;
         }
         Ok(())
     }
@@ -249,3 +251,7 @@ fn continuation_reason_wire(reason: ContinuationReason) -> &'static str {
         ContinuationReason::RecoveryRetry => "recovery_retry",
     }
 }
+
+#[cfg(test)]
+#[path = "turn_response_tests.rs"]
+mod tests;

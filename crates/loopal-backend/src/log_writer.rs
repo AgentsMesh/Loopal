@@ -2,17 +2,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use loopal_error::ToolIoError;
-use loopal_tool_api::output_tail::OutputTail;
-use loopal_tool_api::{HeadTail, StderrCappedBuffer};
+use loopal_tool_api::{HeadTail, OutputTail, StderrCappedBuffer};
 use parking_lot::Mutex as PlMutex;
 use tokio::fs::File;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
 
 use crate::tmp_cleanup::{is_valid_session_id, loopal_tmp_root, session_tmp_root_in};
 
-// reason: unbuffered File so each line is visible to file tailers immediately.
 pub type LogWriter = TokioMutex<File>;
 
 pub fn session_bash_dir(session_id: &str) -> PathBuf {
@@ -27,30 +25,23 @@ pub async fn create_log_file(session_id: &str) -> Result<(PathBuf, LogWriter), T
     create_log_file_in(&loopal_tmp_root(), session_id).await
 }
 
-// reason: explicit `root` lets tests target an isolated tempdir instead of
-// the shared `$TMPDIR/loopal/`. Mirrors `cleanup_*_in` so test fixtures can
-// build closed, race-free worlds without touching the shared root.
 pub async fn create_log_file_in(
     root: &Path,
     session_id: &str,
 ) -> Result<(PathBuf, LogWriter), ToolIoError> {
-    // reason: reject path-traversal session ids before they create files
-    // outside `$TMPDIR/loopal/{id}/bash/`. Mirrors cleanup_session_tmp's
-    // guard so both ends share the same trust boundary.
     if !is_valid_session_id(session_id) {
         return Err(ToolIoError::ExecFailed(format!(
             "invalid session id for log file: {session_id:?}"
         )));
     }
-    let dir = session_bash_dir_in(root, session_id);
-    tokio::fs::create_dir_all(&dir)
-        .await
-        .map_err(|e| ToolIoError::ExecFailed(format!("create log dir {}: {e}", dir.display())))?;
+    let session_dir = session_tmp_root_in(root, session_id);
+    let bash_dir = session_bash_dir_in(root, session_id);
+    crate::private_log_file::prepare_directory(root).await?;
+    crate::private_log_file::prepare_directory(&session_dir).await?;
+    crate::private_log_file::prepare_directory(&bash_dir).await?;
     let id = Uuid::new_v4().simple().to_string();
-    let path = dir.join(format!("{id}.log"));
-    let file = File::create(&path)
-        .await
-        .map_err(|e| ToolIoError::ExecFailed(format!("create log file {}: {e}", path.display())))?;
+    let path = bash_dir.join(format!("{id}.log"));
+    let file = crate::private_log_file::create(&path).await?;
     Ok((path, TokioMutex::new(file)))
 }
 
@@ -60,45 +51,16 @@ pub enum LineSink {
     Stderr(Arc<PlMutex<StderrCappedBuffer>>),
 }
 
-// reason: file write_all MUST precede in-memory push so the file is the
-// strict ground truth — readers that see a line in HeadTail/StderrBuf are
-// guaranteed to find it in the log file too.
 pub async fn read_lines_into_sink<R: tokio::io::AsyncRead + Unpin>(
     reader: R,
     writer: Arc<LogWriter>,
     sink: LineSink,
     progress_tail: Option<Arc<OutputTail>>,
 ) {
-    let mut br = BufReader::new(reader);
-    let mut line = String::new();
-    loop {
-        line.clear();
-        match br.read_line(&mut line).await {
-            Ok(0) => break,
-            Ok(_) => {
-                let trimmed = line.trim_end_matches('\n').to_string();
-                let to_file = match &sink {
-                    LineSink::Stdout(_) => line.clone(),
-                    LineSink::Stderr(_) => format!("[err] {line}"),
-                };
-                {
-                    let mut w = writer.lock().await;
-                    let _ = w.write_all(to_file.as_bytes()).await;
-                }
-                if let Some(t) = &progress_tail {
-                    t.push_line(trimmed.clone());
-                }
-                match &sink {
-                    LineSink::Stdout(ht) => ht.push_line(trimmed),
-                    LineSink::Stderr(sb) => sb.lock().push_str(&line),
-                }
-            }
-            Err(_) => break,
-        }
-    }
+    crate::log_capture::capture(reader, writer, sink, progress_tail).await;
 }
 
 pub async fn flush_writer(writer: &LogWriter) {
-    let mut w = writer.lock().await;
-    let _ = w.flush().await;
+    let mut file = writer.lock().await;
+    let _ = file.flush().await;
 }

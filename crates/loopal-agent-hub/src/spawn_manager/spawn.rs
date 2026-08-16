@@ -1,115 +1,122 @@
 use std::sync::Arc;
+
 use tokio::sync::Mutex;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::hub::Hub;
+use crate::types::RegisteredAgent;
 
-use super::register::register_agent_connection_with_policy;
+use super::PreparedSpawn;
+#[cfg(test)]
+pub(super) use super::process::ProcessFuture;
+pub(super) use super::process::{
+    PreparedAgentProcess, PreparedControl, SpawnProcess, WorkflowProcessOwner,
+};
+use super::register::register_prepared_spawn;
 
-/// Spawn a real agent process, initialize, start, and register in Hub.
-#[allow(clippy::too_many_arguments)]
-pub async fn spawn_and_register(
+pub(crate) async fn spawn_and_register(
     hub: Arc<Mutex<Hub>>,
-    name: String,
-    cwd: String,
-    model: Option<String>,
-    prompt: Option<String>,
-    parent: Option<String>,
-    permission_mode: Option<String>,
-    decision_mode: Option<String>,
-    agent_type: Option<String>,
-    depth: Option<u32>,
-    fork_context: Option<serde_json::Value>,
-    no_sandbox: bool,
-    notify_parent_on_completion: bool,
+    prepared: PreparedSpawn,
 ) -> Result<String, String> {
-    if parent.is_some() {
-        let h = hub.lock().await;
-        let sub_count = h.registry.sub_agent_count();
-        if sub_count >= h.max_total_agents as usize {
-            return Err(format!(
-                "Spawn budget exhausted ({sub_count}/{} sub-agents). \
-                 Complete the task with your own tools.",
-                h.max_total_agents
-            ));
-        }
-    }
-
-    info!(agent = %name, parent = ?parent, "spawn: forking process");
-    let agent_proc = loopal_agent_client::AgentProcess::spawn(None)
+    spawn_and_register_with_execution(hub, prepared)
         .await
-        .map_err(|e| format!("failed to spawn agent process: {e}"))?;
+        .map(|value| value.agent_id)
+}
 
-    let client = loopal_agent_client::AgentClient::new(agent_proc.transport());
-    info!(agent = %name, "spawn: initializing IPC");
-    if let Err(e) = client.initialize().await {
-        warn!(agent = %name, error = %e, "spawn: init failed, killing orphan");
-        let _ = agent_proc.shutdown().await;
-        return Err(format!("agent initialize failed: {e}"));
+pub(crate) async fn spawn_and_register_with_execution(
+    hub: Arc<Mutex<Hub>>,
+    prepared: PreparedSpawn,
+) -> Result<RegisteredAgent, String> {
+    let process = fork_process(&hub, &prepared).await?;
+    initialize_and_register(hub, prepared, process).await
+}
+
+pub(super) async fn fork_process(
+    hub: &Arc<Mutex<Hub>>,
+    prepared: &PreparedSpawn,
+) -> Result<loopal_agent_client::AgentProcess, String> {
+    fork_process_if(hub, prepared, || Ok(())).await
+}
+
+pub(super) async fn fork_process_if(
+    hub: &Arc<Mutex<Hub>>,
+    prepared: &PreparedSpawn,
+    admit: impl FnOnce() -> Result<(), String>,
+) -> Result<loopal_agent_client::AgentProcess, String> {
+    info!(agent = %prepared.name, parent = ?prepared.parent, "spawn: forking process");
+    super::fork::authorized(hub, prepared, || {
+        admit()?;
+        loopal_agent_client::AgentProcess::spawn_now(None)
+            .map_err(|error| format!("failed to spawn agent process: {error}"))
+    })
+    .await
+}
+
+pub(super) async fn prepare_and_register_process<P: SpawnProcess>(
+    hub: Arc<Mutex<Hub>>,
+    prepared: PreparedSpawn,
+    process: P,
+) -> Result<PreparedAgentProcess<P>, String> {
+    let client = loopal_agent_client::AgentClient::new(process.transport());
+    if let Err(error) = client.initialize().await {
+        let _ = process.shutdown().await;
+        return Err(format!("agent initialize failed: {error}"));
     }
-    info!(agent = %name, "spawn: starting agent");
-    let model_for_registry = model.clone();
-    let session_id = match client
-        .start_agent(&loopal_agent_client::StartAgentParams {
-            cwd: std::path::PathBuf::from(&cwd),
-            model,
-            mode: Some("act".to_string()),
-            prompt,
-            permission_mode,
-            decision_mode,
-            no_sandbox,
-            resume: None,
-            lifecycle: Some("ephemeral".to_string()),
-            agent_type,
-            depth,
-            fork_context,
-        })
-        .await
-    {
-        Ok(sid) => Some(sid),
-        Err(e) => {
-            warn!(agent = %name, error = %e, "spawn: start failed, killing orphan");
-            let _ = agent_proc.shutdown().await;
-            return Err(format!("agent/start failed: {e}"));
-        }
-    };
-
-    let (conn, incoming_rx) = client.into_parts();
-    match register_agent_connection_with_policy(
-        hub.clone(),
-        &name,
-        conn,
-        incoming_rx,
-        parent.as_deref(),
-        model_for_registry.as_deref(),
-        session_id.as_deref(),
-        notify_parent_on_completion,
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let start_params = prepared.start_params(session_id.clone());
+    let (connection, incoming) = client.into_parts();
+    let registered = match register_prepared_spawn(
+        hub,
+        &prepared,
+        connection.clone(),
+        incoming,
+        Some(&session_id),
     )
     .await
     {
-        Ok(agent_id) => {
-            let (spawn_registry, mcp_service) = {
-                let h = hub.lock().await;
-                (h.spawn_registry.clone(), h.mcp_service.clone())
-            };
-            let parent_name = parent
-                .as_ref()
-                .map(|p| loopal_protocol::QualifiedAddress::parse(p).agent.clone());
-            let cwd_path = std::path::PathBuf::from(&cwd);
-            spawn_registry.register(name.clone(), cwd_path.clone(), parent_name.clone());
-            mcp_service
-                .on_agent_attach(name.clone(), cwd_path, parent_name)
-                .await;
-            tokio::spawn(async move {
-                let _ = agent_proc.wait().await;
-            });
-            info!(agent = %name, "agent spawned and registered via Hub");
-            Ok(agent_id)
+        Ok(value) => value,
+        Err(error) => {
+            let _ = process.shutdown().await;
+            return Err(error);
         }
-        Err(e) => {
-            warn!(agent = %name, error = %e, "registration failed, killing orphan");
-            let _ = agent_proc.shutdown().await;
-            Err(e)
-        }
-    }
+    };
+    Ok(PreparedAgentProcess::new(
+        process,
+        connection,
+        registered,
+        session_id,
+        start_params,
+        prepared.name,
+    ))
 }
+
+async fn initialize_and_register<P: SpawnProcess>(
+    hub: Arc<Mutex<Hub>>,
+    prepared: PreparedSpawn,
+    process: P,
+) -> Result<RegisteredAgent, String> {
+    let prepared = prepare_and_register_process(hub.clone(), prepared, process).await?;
+    let registered = prepared.registered.clone();
+    if let Err(error) = prepared.activate().await {
+        crate::finish::finish_and_deliver_exact(
+            &hub,
+            &prepared.name,
+            loopal_protocol::AgentCompletion::new("start_failed", Some(error.clone())),
+            &prepared.connection,
+            &registered.execution,
+        )
+        .await;
+        prepared.shutdown().await;
+        return Err(error);
+    }
+    hub.lock().await.registry.set_lifecycle(
+        &registered.execution.address.agent,
+        crate::AgentLifecycle::Running,
+    );
+    prepared.spawn_wait();
+    Ok(registered)
+}
+
+#[cfg(test)]
+#[path = "spawn_tests.rs"]
+mod tests;

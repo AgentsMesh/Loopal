@@ -141,6 +141,15 @@ LLM 看到的占位符：`<secret_ref:NAME>`（wire 格式）。Author 格式 `{
 - **MCP server 故障不传染**：单个 MCP server crash 只影响其工具，Hub 标记该 server `Failed`，其他 MCP 与 agent loop 继续运行。
 - **Agent 进程 crash 是预期事件**：sub-agent 设计成可重启、可被 kill。Hub 是 supervisor，按策略重 spawn 或上报 root agent。
 
+### 8.1 Builtin process containment boundary
+
+Builtin shell 与 background process 由唯一的 armed owner 持有。foreground wait、streaming timeout、background adoption 与 monitor 之间只能整体转移该 owner；不能拆出 raw child handle。armed owner 被取消或 drop 时必须触发容器级清理，terminal 状态只能在进程终止证明与 capture drain 完成后发布。
+
+- Unix 在 exec 前调用 `setsid()`，把 command root 放进新的 session/process group。wait、terminate 与 drop 清理覆盖仍留在该 isolated process group 中的成员；root 先退出时也要清理 residual members 后才完成。主动调用 `setsid()` 或迁出 process group 的 descendant 可以逃逸，因此这里保证的是 process-group containment，**不是**不可逃逸的任意 descendant tree。
+- Windows 在 suspended child resume 前把它纳入启用 kill-on-close 的 Job Object。wait、terminate 与 drop 以整个 Job 为边界，root 退出后仍要终止 residual Job members；只有确认至少一个 child-owned suspended thread 已 resume 才允许 spawn 成功。
+
+该边界不向 tool 或 workflow 暴露 raw PID、process-group、Job handle 或通用 process-tree primitive。更强的 Unix 任意后代隔离需要 container/cgroup 等独立 sandbox 机制，不能由 `killpg` 的语义推导。
+
 ## 9. 落地阶段
 
 | 阶段 | 范围 | 工期估算 |
@@ -164,6 +173,14 @@ LLM 看到的占位符：`<secret_ref:NAME>`（wire 格式）。Author 格式 `{
 
 新决策追加到 §11 决策表底部，每条带日期、范围、决策、备注。
 
+### 9.1 WorkflowCoordinator durability exception
+
+静态 DAG workflow 需要在 Hub crash 后恢复 graph revision、node/attempt terminal commit、请求幂等记录与取消因果链。把 journal 放在 Agent 或 root Session writer 会与 Hub scheduler 形成双写和 split brain，因此 O1 的无状态规则对这一聚合不再适用。
+
+例外严格限定为 Hub 内单写者 `WorkflowCoordinator`：它独占 append-only `WorkflowRun` journal 和 snapshot 加速数据，不在 Hub mutex 内做 I/O。root Session 只提供 Hub 推导的存放位置与索引；root/child Agent、UI event 和 projection 都不是权威 writer。journal 只保存 concrete-free workflow identity 与状态，不保存连接 generation、plaintext secret、sandbox/permission override 或 generic artifact。
+
+这是新增协议的 breaking change，不维护 mixed-version。Stage 1 只交付协议、纯验证和纯 reducer，executor 保持禁用；后续 coordinator 必须先通过 graph validation，并在 output-node terminal commit 前提供完整 JSON Schema semantic validator。该例外不改变其他 O1 runtime 状态的无状态重启规则，也不授权 cross-Hub execution 或 parallel writer。
+
 ## 11. 决策表
 
 | ID | 日期 | 范围 | 决策 | 备注 |
@@ -182,3 +199,5 @@ LLM 看到的占位符：`<secret_ref:NAME>`（wire 格式）。Author 格式 `{
 | L1 | 2026-05-20 | per-agent 实例生命周期 | agent detach 立即 stop 实例，不池化 | 简单清晰，无状态污染 |
 | N1 | 2026-05-20 | Hub 不可用 | Graceful degrade：builtin tool 正常；MCP/secret 返回错误给 LLM | LLM 能决策是否重试 |
 | O1 | 2026-05-20 | Hub crash recovery | Hub 是 stateless service，重启重新加载 cwd vault + 重连 MCP | 不持久化 runtime 状态 |
+| O1a | 2026-08-08 | WorkflowCoordinator durability | 仅 `WorkflowCoordinator` 可在 Hub 内持久化 `WorkflowRun` append-only journal；单写者拥有 graph、revision、attempt 与恢复，Agent 和 root Session 仅提供执行与存放位置 | O1 的窄例外；不授权其他 Hub runtime 状态持久化，不引入第二 executor、MCP owner 或跨 Hub lease |
+| P1 | 2026-08-10 | Builtin process containment | foreground、timeout adoption 与 background monitor 整体转移唯一 armed owner；terminal publication 等待 containment termination proof 与 capture drain | Unix 保证 isolated process-group containment，不能阻止主动 `setsid()` 的 descendant 逃逸；Windows 以 kill-on-close Job Object 为边界 |

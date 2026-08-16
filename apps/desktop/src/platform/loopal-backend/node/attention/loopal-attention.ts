@@ -77,6 +77,7 @@ function permissionEvent(
       title: `Allow ${tool}`,
       detail: stringify(value.input),
       risk: permissionRisk(tool),
+      ...(permissionIntentDigest(value) ? { intentDigest: permissionIntentDigest(value) } : {}),
       createdAt: now().toISOString(),
     },
   }
@@ -141,6 +142,14 @@ function scopeFields(scope: SessionRuntimeScope) {
     runtimeId: scope.runtimeId,
     generation: scope.generation,
   }
+}
+
+function permissionIntentDigest(value: Record<string, unknown>): string | undefined {
+  const intent = isRecord(value.permission_intent) ? value.permission_intent : undefined
+  const digest = intent?.intent_digest ?? value.intent_digest
+  return typeof digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(digest)
+    ? digest
+    : undefined
 }
 
 function permissionRisk(tool: string): 'low' | 'medium' | 'high' {

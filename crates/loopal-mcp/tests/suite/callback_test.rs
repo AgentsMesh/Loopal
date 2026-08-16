@@ -101,3 +101,28 @@ async fn test_callback_server_missing_params_returns_400() {
     // rx should NOT have received anything
     drop(rx);
 }
+
+#[tokio::test]
+async fn test_callback_server_handles_plus_and_invalid_percent_encoding() {
+    let (port, rx) = callback::start_callback_server()
+        .await
+        .expect("server start failed");
+
+    let mut stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .expect("connect failed");
+    let request = format!(
+        "GET /oauth_callback?code=a+b%ZZ&state=ready HTTP/1.1\r\n\
+         Host: localhost:{port}\r\n\r\n"
+    );
+    tokio::io::AsyncWriteExt::write_all(&mut stream, request.as_bytes())
+        .await
+        .expect("write failed");
+
+    let params = tokio::time::timeout(std::time::Duration::from_secs(3), rx)
+        .await
+        .expect("timeout")
+        .expect("channel closed");
+    assert_eq!(params.code, "a b%");
+    assert_eq!(params.state, "ready");
+}

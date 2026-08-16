@@ -7,10 +7,16 @@
 //! This is the "Renderer Process" in the Chromium analogy — it owns the Kernel,
 //! LLM providers, tools, and context pipeline.
 
+mod agent_completion_wire;
+mod agent_event_guard;
+mod agent_initial_turns;
 mod agent_loop_params_factory;
 mod agent_setup;
 mod agent_setup_context;
 mod agent_setup_helpers;
+mod agent_setup_prompt;
+mod agent_setup_session;
+mod agent_setup_workflow;
 mod bg_task_bridge;
 mod bg_task_bridge_monitor;
 mod bg_task_bridge_sampler;
@@ -36,6 +42,7 @@ mod mock_loader;
 pub mod params;
 #[doc(hidden)]
 pub mod prompt_post;
+mod protected_effect_audit;
 mod server;
 pub mod server_info;
 mod server_init;
@@ -52,6 +59,10 @@ mod shared_session;
 mod spawn_policy;
 mod task_bridge;
 mod test_server;
+mod workflow_control_tracking;
+mod workflow_input;
+mod workflow_terminal_forward;
+mod workflow_terminal_pending;
 
 pub use server::{run_agent_server, run_agent_server_with_mock};
 pub use test_server::{run_server_for_test, run_server_for_test_interactive, run_test_connection};
@@ -81,6 +92,7 @@ pub fn hub_frontend_for_test(
 
 #[doc(hidden)]
 pub mod testing {
+    pub use crate::agent_initial_turns::initial_turns_for_start;
     pub use crate::agent_setup::build_with_frontend;
     pub use crate::agent_setup_context::AgentSetupContext;
     pub use crate::agent_setup_helpers::{

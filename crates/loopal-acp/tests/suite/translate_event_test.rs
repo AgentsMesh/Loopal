@@ -3,7 +3,10 @@
 //! land in exactly one of: SessionUpdate, Extension, or None.
 
 use loopal_acp::translate::{AcpNotification, translate_event};
-use loopal_protocol::{AgentEventPayload, BgTaskStatus, GoalTransitionReason};
+use loopal_protocol::{
+    AgentEventPayload, BgTaskStatus, GoalTransitionReason, WorkflowNodeId, WorkflowRunId,
+    WorkflowRunState, WorkflowRunSummary, WorkflowStateCounts,
+};
 
 #[test]
 fn stream_returns_session_update() {
@@ -314,6 +317,43 @@ fn thread_goal_updated_returns_goal_extension() {
         Some(AcpNotification::Extension { method, params }) => {
             assert_eq!(method, "_loopal/goal");
             assert!(params["data"].get("goal").is_some());
+        }
+        _ => panic!("expected Extension"),
+    }
+}
+
+#[test]
+fn workflow_run_changed_returns_typed_workflow_extension() {
+    let workflow = WorkflowRunSummary {
+        id: WorkflowRunId::new("wrun-1"),
+        run_goal: "ship it".into(),
+        state: WorkflowRunState::Running,
+        revision: 3,
+        output_node: WorkflowNodeId::new("output"),
+        counts: WorkflowStateCounts {
+            pending: 1,
+            ready: 2,
+            active: 3,
+            succeeded: 4,
+            failed: 5,
+            cancelled: 6,
+            skipped: 7,
+        },
+        created_at_unix_ms: 10,
+        updated_at_unix_ms: 20,
+    };
+
+    match translate_event(
+        &AgentEventPayload::WorkflowRunChanged(workflow.clone()),
+        "s",
+    ) {
+        Some(AcpNotification::Extension { method, params }) => {
+            assert_eq!(method, "_loopal/workflow");
+            assert_eq!(params["sessionId"], "s");
+            assert_eq!(
+                params["data"]["workflow"],
+                serde_json::to_value(workflow).unwrap()
+            );
         }
         _ => panic!("expected Extension"),
     }

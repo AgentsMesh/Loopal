@@ -2,21 +2,16 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
-
 use loopal_config::HookConfig;
 use loopal_error::LoopalError;
 use loopal_kernel::Kernel;
-use loopal_protocol::{AgentEvent, ControlCommand, Envelope};
 use loopal_provider_api::Message;
 use loopal_provider_api::{StreamChunk, ThinkingConfig};
 use loopal_runtime::AgentMode;
-use loopal_runtime::agent_loop::AgentLoopRunner;
 use loopal_runtime::goal::GoalRuntimeSession;
-use loopal_session::SessionController;
 use loopal_tool_api::{OutstandingTasksDigest, PermissionMode};
 
-use crate::fixture::TestFixture;
+use crate::harness_types::{IntegrationHarness, SpawnedHarness};
 
 pub struct HarnessBuilder {
     pub(crate) calls: Vec<Vec<Result<StreamChunk, LoopalError>>>,
@@ -24,6 +19,7 @@ pub struct HarnessBuilder {
     pub(crate) summarization_model: Option<String>,
     pub(crate) permission_mode: PermissionMode,
     pub(crate) messages: Vec<Message>,
+    pub(crate) messages_pending: bool,
     pub(crate) mode: AgentMode,
     pub(crate) lifecycle: loopal_runtime::LifecycleMode,
     pub(crate) system_prompt: String,
@@ -53,6 +49,7 @@ impl HarnessBuilder {
             summarization_model: None,
             permission_mode: PermissionMode::Bypass,
             messages: vec![Message::user("hello")],
+            messages_pending: true,
             mode: AgentMode::Act,
             lifecycle: loopal_runtime::LifecycleMode::Ephemeral,
             system_prompt: "test".into(),
@@ -91,6 +88,12 @@ impl HarnessBuilder {
     }
     pub fn messages(mut self, m: Vec<Message>) -> Self {
         self.messages = m;
+        self.messages_pending = false;
+        self
+    }
+    pub fn prompt(mut self, m: Vec<Message>) -> Self {
+        self.messages = m;
+        self.messages_pending = true;
         self
     }
     pub fn mode(mut self, m: AgentMode) -> Self {
@@ -158,44 +161,7 @@ impl HarnessBuilder {
         harness
     }
 
-    async fn into_wired(self) -> (SpawnedHarness, AgentLoopRunner) {
+    async fn into_wired(self) -> (SpawnedHarness, loopal_runtime::agent_loop::AgentLoopRunner) {
         crate::wiring::wire(self).await
     }
-}
-
-pub struct IntegrationHarness {
-    pub runner: AgentLoopRunner,
-    pub event_rx: mpsc::Receiver<AgentEvent>,
-    pub mailbox_tx: mpsc::Sender<Envelope>,
-    pub control_tx: mpsc::Sender<ControlCommand>,
-    pub interrupt: loopal_protocol::InterruptSignal,
-    pub session_ctrl: SessionController,
-    pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
-}
-
-impl IntegrationHarness {
-    fn from_parts(h: SpawnedHarness, runner: AgentLoopRunner) -> Self {
-        Self {
-            runner,
-            event_rx: h.event_rx,
-            mailbox_tx: h.mailbox_tx,
-            control_tx: h.control_tx,
-            interrupt: h.interrupt,
-            session_ctrl: h.session_ctrl,
-            fixture: h.fixture,
-            recorded_messages: h.recorded_messages,
-        }
-    }
-}
-
-pub struct SpawnedHarness {
-    pub event_tx: mpsc::Sender<AgentEvent>,
-    pub event_rx: mpsc::Receiver<AgentEvent>,
-    pub mailbox_tx: mpsc::Sender<Envelope>,
-    pub control_tx: mpsc::Sender<ControlCommand>,
-    pub interrupt: loopal_protocol::InterruptSignal,
-    pub session_ctrl: SessionController,
-    pub fixture: TestFixture,
-    pub recorded_messages: std::sync::Arc<std::sync::Mutex<Vec<Vec<loopal_turn::Turn>>>>,
 }

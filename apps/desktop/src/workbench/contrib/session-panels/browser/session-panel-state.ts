@@ -3,7 +3,7 @@ import {
 } from '../../../../shared/contracts'
 
 export type SessionPanelId =
-  | 'agents' | 'tasks' | 'background' | 'scheduled'
+  | 'agents' | 'tasks' | 'workflows' | 'background' | 'scheduled'
   | 'artifacts' | 'mcp' | 'diagnostics'
 
 export interface SessionPanelEntry {
@@ -41,6 +41,12 @@ export function buildSessionPanelState(input: {
     panels.push({
       id: 'tasks', label: 'Tasks', count: activeTasks.length + Number(Boolean(activeGoal)),
     })
+  }
+  const workflows = view
+    ? [...view.workflows.active, ...view.workflows.recent]
+    : []
+  if (workflows.length > 0) {
+    panels.push({ id: 'workflows', label: 'Workflows', count: workflows.length })
   }
   const visibleBackground = view?.backgroundTasks.filter(
     (task) => task.status === 'running',

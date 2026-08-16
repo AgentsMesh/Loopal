@@ -79,3 +79,92 @@ pub(crate) async fn wait_for_initialize(
 ) -> anyhow::Result<()> {
     wait_for_initialize_with_token(connection, rx, None).await
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use loopal_ipc::connection::{Connection, Incoming, Listening};
+    use loopal_ipc::protocol::methods;
+
+    use super::wait_for_initialize_with_token;
+
+    fn connection_pair() -> (
+        Arc<Connection<Listening>>,
+        Arc<Connection<Listening>>,
+        tokio::sync::mpsc::Receiver<Incoming>,
+    ) {
+        let (server_transport, client_transport) = loopal_ipc::duplex_pair();
+        let (server, server_rx) = Connection::new(server_transport).into_listening();
+        let (client, _client_rx) = Connection::new(client_transport).into_listening();
+        (server, client, server_rx)
+    }
+
+    #[tokio::test]
+    async fn invalid_token_is_rejected_before_initialization() {
+        let (server, client, mut server_rx) = connection_pair();
+        let server_task = tokio::spawn(async move {
+            wait_for_initialize_with_token(&server, &mut server_rx, Some("expected")).await
+        });
+
+        let client_result = client
+            .send_request(
+                methods::INITIALIZE.name,
+                serde_json::json!({"token": "wrong"}),
+            )
+            .await;
+
+        let error = client_result.expect_err("token request must fail");
+        assert_eq!(
+            error.remote_code(),
+            Some(loopal_ipc::jsonrpc::INVALID_REQUEST)
+        );
+        assert!(server_task.await.unwrap().is_err());
+    }
+
+    #[tokio::test]
+    async fn non_initialize_requests_and_notifications_are_ignored_until_valid_token() {
+        let (server, client, mut server_rx) = connection_pair();
+        let server_task = tokio::spawn(async move {
+            wait_for_initialize_with_token(&server, &mut server_rx, Some("expected")).await
+        });
+        client
+            .send_notification("agent/noise", serde_json::Value::Null)
+            .await
+            .unwrap();
+        let wrong = client
+            .send_request("agent/not-initialize", serde_json::Value::Null)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            wrong.remote_code(),
+            Some(loopal_ipc::jsonrpc::INVALID_REQUEST)
+        );
+        let initialized = client
+            .send_request(
+                methods::INITIALIZE.name,
+                serde_json::json!({"token": "expected"}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(initialized["protocol_version"], 1);
+        assert!(server_task.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn closed_input_channel_is_reported_before_initialization() {
+        let (transport, _peer) = loopal_ipc::duplex_pair();
+        let (connection, _incoming) = Connection::new(transport).into_listening();
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        drop(sender);
+
+        let error = wait_for_initialize_with_token(&connection, &mut receiver, None)
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("connection closed before initialize")
+        );
+    }
+}

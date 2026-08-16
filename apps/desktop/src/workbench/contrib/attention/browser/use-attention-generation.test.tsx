@@ -3,6 +3,8 @@ import { createTestAPI, updatedAt } from '../../../../../test/support/workbench/
 import { type Stage2WorkbenchModel } from '../../../browser/stage2-view-model'
 import { useWorkbenchRuntimeController } from '../../../browser/use-workbench-runtime-controller'
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 function context(generation: number): Stage2WorkbenchModel['context'] {
   return {
     workspaces: [{ id: 'workspace', name: 'Loopal', detail: '/loopal' }],
@@ -28,6 +30,7 @@ describe('attention runtime generation isolation', () => {
       request: {
         id: 'same-id', sessionId: 'session', runtimeId: 'runtime-1', generation: 1,
         agentId: 'main', tool: 'shell', title: 'Run', detail: 'test', risk: 'medium',
+        intentDigest,
         createdAt: updatedAt,
       },
     }))
@@ -37,6 +40,7 @@ describe('attention runtime generation isolation', () => {
       request: {
         id: 'other-id', sessionId: 'session', runtimeId: 'runtime-1', generation: 1,
         agentId: 'main', tool: 'read', title: 'Other', detail: 'read', risk: 'low',
+        intentDigest,
         createdAt: updatedAt,
       },
     }))
@@ -45,6 +49,7 @@ describe('attention runtime generation isolation', () => {
       request: {
         id: 'same-id', sessionId: 'session', runtimeId: 'runtime-1', generation: 1,
         agentId: 'main', tool: 'shell', title: 'Updated', detail: 'new', risk: 'high',
+        intentDigest,
         createdAt: updatedAt,
       },
     }))
@@ -56,7 +61,7 @@ describe('attention runtime generation isolation', () => {
     ))
     await waitFor(() => expect(respondPermission).toHaveBeenCalledWith({
       sessionId: 'session', runtimeId: 'runtime-1', generation: 1,
-      agentId: 'main', requestId: 'same-id', decision: 'allow_session',
+      agentId: 'main', requestId: 'same-id', intentDigest, decision: 'allow_session',
     }))
     hook.rerender({ generation: 2 })
     await waitFor(() => expect(hook.result.current.model.permissions).toHaveLength(0))

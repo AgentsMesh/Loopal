@@ -18,14 +18,8 @@ pub fn resolve_thinking_config(
             _ => None,
         },
         ThinkingConfig::Auto => auto_config(capability, max_output_tokens),
-        ThinkingConfig::Effort { level } if supports_effort(capability, *level) => {
-            Some(config.clone())
-        }
-        ThinkingConfig::Budget { .. }
-            if matches!(
-                capability,
-                ThinkingCapability::BudgetRequired | ThinkingCapability::ThinkingBudget
-            ) =>
+        ThinkingConfig::Effort { .. } | ThinkingConfig::Budget { .. }
+            if capability_supports(config, capability) =>
         {
             Some(config.clone())
         }
@@ -38,6 +32,22 @@ pub fn resolve_thinking_config(
         }
     };
     Ok(resolved)
+}
+
+/// Apply a supported recommendation only when the configured value is `Auto`.
+pub fn resolve_thinking_config_with_recommendation(
+    configured: &ThinkingConfig,
+    recommendation: Option<&ThinkingConfig>,
+    capability: ThinkingCapability,
+    max_output_tokens: u32,
+) -> Result<Option<ThinkingConfig>> {
+    if !matches!(configured, ThinkingConfig::Auto) {
+        return resolve_thinking_config(configured, capability, max_output_tokens);
+    }
+    let effective = recommendation
+        .filter(|candidate| capability_supports(candidate, capability))
+        .unwrap_or(configured);
+    resolve_thinking_config(effective, capability, max_output_tokens)
 }
 
 fn auto_config(capability: ThinkingCapability, max_output_tokens: u32) -> Option<ThinkingConfig> {
@@ -60,6 +70,17 @@ fn auto_config(capability: ThinkingCapability, max_output_tokens: u32) -> Option
     }
 }
 
+fn capability_supports(config: &ThinkingConfig, capability: ThinkingCapability) -> bool {
+    match config {
+        ThinkingConfig::Auto | ThinkingConfig::Disabled => true,
+        ThinkingConfig::Effort { level } => supports_effort(capability, *level),
+        ThinkingConfig::Budget { .. } => matches!(
+            capability,
+            ThinkingCapability::BudgetRequired | ThinkingCapability::ThinkingBudget
+        ),
+    }
+}
+
 fn supports_effort(capability: ThinkingCapability, level: EffortLevel) -> bool {
     match capability {
         ThinkingCapability::Adaptive => !matches!(level, EffortLevel::None | EffortLevel::XHigh),
@@ -76,130 +97,6 @@ fn supports_effort(capability: ThinkingCapability, level: EffortLevel) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn full_reasoning_auto_and_disabled_are_explicit() {
-        assert!(matches!(
-            resolve_thinking_config(
-                &ThinkingConfig::Auto,
-                ThinkingCapability::FullReasoningEffort,
-                128_000,
-            ),
-            Ok(Some(ThinkingConfig::Effort {
-                level: EffortLevel::Medium
-            }))
-        ));
-        assert!(matches!(
-            resolve_thinking_config(
-                &ThinkingConfig::Disabled,
-                ThinkingCapability::FullReasoningEffort,
-                128_000,
-            ),
-            Ok(Some(ThinkingConfig::Effort {
-                level: EffortLevel::None
-            }))
-        ));
-    }
-
-    #[test]
-    fn budget_required_auto_uses_80_percent() {
-        let result = resolve_thinking_config(
-            &ThinkingConfig::Auto,
-            ThinkingCapability::BudgetRequired,
-            16_384,
-        );
-        assert!(matches!(
-            result,
-            Ok(Some(ThinkingConfig::Budget { tokens: 13_107 }))
-        ));
-    }
-
-    #[test]
-    fn full_reasoning_accepts_xhigh_and_max() {
-        for level in [EffortLevel::XHigh, EffortLevel::Max] {
-            let result = resolve_thinking_config(
-                &ThinkingConfig::Effort { level },
-                ThinkingCapability::FullReasoningEffort,
-                128_000,
-            );
-            assert!(
-                matches!(result, Ok(Some(ThinkingConfig::Effort { level: got })) if got == level)
-            );
-        }
-    }
-
-    #[test]
-    fn capability_config_matrix_is_explicit() {
-        let cases = [
-            (ThinkingCapability::None, ThinkingConfig::Auto, "none"),
-            (
-                ThinkingCapability::ReasoningEffort,
-                ThinkingConfig::Effort {
-                    level: EffortLevel::High,
-                },
-                "effort",
-            ),
-            (
-                ThinkingCapability::Adaptive,
-                ThinkingConfig::Effort {
-                    level: EffortLevel::Max,
-                },
-                "effort",
-            ),
-            (
-                ThinkingCapability::ThinkingBudget,
-                ThinkingConfig::Budget { tokens: 4_096 },
-                "budget",
-            ),
-            (
-                ThinkingCapability::BudgetRequired,
-                ThinkingConfig::Budget { tokens: 4_096 },
-                "budget",
-            ),
-        ];
-        for (capability, config, expected) in cases {
-            let resolved = resolve_thinking_config(&config, capability, 128_000).unwrap();
-            assert_eq!(
-                match resolved {
-                    None => "none",
-                    Some(ThinkingConfig::Effort { .. }) => "effort",
-                    Some(ThinkingConfig::Budget { .. }) => "budget",
-                    Some(_) => "unresolved",
-                },
-                expected
-            );
-        }
-    }
-
-    #[test]
-    fn unsupported_combinations_never_degrade() {
-        for (capability, config) in [
-            (
-                ThinkingCapability::ReasoningEffort,
-                ThinkingConfig::Effort {
-                    level: EffortLevel::Max,
-                },
-            ),
-            (
-                ThinkingCapability::ReasoningEffort,
-                ThinkingConfig::Budget { tokens: 5_000 },
-            ),
-            (
-                ThinkingCapability::Adaptive,
-                ThinkingConfig::Effort {
-                    level: EffortLevel::XHigh,
-                },
-            ),
-            (
-                ThinkingCapability::ThinkingBudget,
-                ThinkingConfig::Effort {
-                    level: EffortLevel::None,
-                },
-            ),
-        ] {
-            assert!(resolve_thinking_config(&config, capability, 100_000).is_err());
-        }
-    }
-}
+mod recommendation_tests;
+#[cfg(test)]
+mod tests;

@@ -95,6 +95,32 @@ fn goal_continuation_trigger_projects_to_user_message() {
 }
 
 #[test]
+fn workflow_result_projects_exact_content_and_typed_origin() {
+    let t = turn_with(
+        TurnTrigger::WorkflowResult {
+            session_id: "session".into(),
+            run_id: "wrun_one".into(),
+            terminal_revision: 9,
+            payload_digest: format!("sha256:{}", "1".repeat(64)),
+            state: "succeeded".into(),
+            content: "durable result".into(),
+        },
+        vec![],
+    );
+    let messages = project_turn_to_messages(&t);
+    assert_eq!(messages[0].role, MessageRole::User);
+    assert_eq!(messages[0].text_content(), "durable result");
+    assert!(matches!(
+        &messages[0].origin,
+        Some(MessageOrigin::WorkflowResult {
+            run_id,
+            terminal_revision: 9,
+            state,
+        }) if run_id == "wrun_one" && state == "succeeded"
+    ));
+}
+
+#[test]
 fn cron_trigger_prefixed_with_scheduled() {
     let t = turn_with(
         TurnTrigger::Cron {

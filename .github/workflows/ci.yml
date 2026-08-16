@@ -7,6 +7,27 @@ on:
     branches: [main]
 
 jobs:
+  coverage:
+    name: Scoped Rust Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config bubblewrap
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.ref == 'refs/heads/main' && 'bazel-disk-coverage' || '' }}
+          repository-cache: true
+
+      - name: Scoped Rust coverage gate
+        run: bash tools/coverage/run_scoped_gate.sh
+
   build-and-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -30,6 +51,23 @@ jobs:
 
       - name: Build
         run: bazel build //...
+
+      - name: Windows workflow journal identity gate
+        if: runner.os == 'Windows'
+        run: >-
+          bazel test
+          //crates/loopal-storage:loopal-storage-unit-test
+          //crates/loopal-storage:workflow_journal_windows_test
+          --config=ci
+          --test_output=errors
+
+      - name: Windows Job Object runtime gate
+        if: runner.os == 'Windows'
+        run: >-
+          bazel test
+          //crates/loopal-backend:process_group_windows_test
+          --config=ci
+          --test_output=errors
 
       - name: Test
         run: bazel test //... --config=ci

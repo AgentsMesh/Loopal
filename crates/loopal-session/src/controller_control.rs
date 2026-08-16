@@ -1,6 +1,7 @@
 use loopal_protocol::{AgentMode, ControlCommand};
 
 use crate::controller::SessionController;
+use crate::state::ROOT_AGENT;
 
 impl SessionController {
     pub async fn send_control(&self, target: String, cmd: ControlCommand) {
@@ -71,11 +72,9 @@ impl SessionController {
     }
 
     pub async fn resume_session(&self, session_id: &str) {
-        let target = {
-            let mut s = self.lock();
-            s.root_session_id = Some(session_id.to_string());
-            s.active_view.clone()
-        };
+        // `/resume` resolves root sessions. Keep the command on the managed
+        // root lease even when the TUI is currently viewing a child agent.
+        let target = ROOT_AGENT.to_string();
         self.backend
             .send_control_to_agent(
                 &target,

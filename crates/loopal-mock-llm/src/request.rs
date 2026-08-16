@@ -44,6 +44,10 @@ pub struct RequestRecord {
     pub api_key_present: bool,
     pub protocol_version_present: bool,
     pub matched: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_label: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub match_errors: Vec<String>,
 }
 
 impl RequestRecord {
@@ -77,6 +81,8 @@ impl RequestRecord {
             api_key_present: key,
             protocol_version_present: version,
             matched: true,
+            call_label: None,
+            match_errors: Vec::new(),
         }
     }
 }

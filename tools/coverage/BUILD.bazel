@@ -1,0 +1,116 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+
+rust_binary(
+    name = "gate",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/scope_review.rs",
+            "src/scope_review_main.rs",
+        ],
+    ),
+    compile_data = [
+        "critical_functions.txt",
+        "included_sources.txt",
+    ],
+    crate_root = "src/main.rs",
+    data = [
+        "critical_functions.txt",
+        "included_sources.txt",
+    ],
+    edition = "2024",
+    visibility = ["//visibility:public"],
+)
+
+rust_binary(
+    name = "scope_review",
+    srcs = [
+        "src/scope_review.rs",
+        "src/scope_review_main.rs",
+    ],
+    crate_root = "src/scope_review_main.rs",
+    edition = "2024",
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "branch_supplement_test",
+    srcs = ["tests/branch_supplement.rs"] + glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/main.rs",
+            "src/manifest.rs",
+            "src/scope_review.rs",
+            "src/scope_review_main.rs",
+        ],
+    ),
+    crate_root = "tests/branch_supplement.rs",
+    edition = "2024",
+    rustc_flags = ["-Adead_code"],
+)
+
+rust_test(
+    name = "gate_test",
+    srcs = ["tests/suite.rs"] + glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/scope_review.rs",
+            "src/scope_review_main.rs",
+        ],
+    ),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    rustc_flags = ["-Adead_code"],
+)
+
+rust_test(
+    name = "parser_test",
+    srcs = ["tests/parser.rs"] + glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/scope_review.rs",
+            "src/scope_review_main.rs",
+        ],
+    ),
+    crate_root = "tests/parser.rs",
+    edition = "2024",
+    rustc_flags = ["-Adead_code"],
+)
+
+rust_test(
+    name = "thresholds_test",
+    srcs = [
+        "tests/threshold_rust_symbols.rs",
+        "tests/thresholds.rs",
+    ] + glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/scope_review.rs",
+            "src/scope_review_main.rs",
+        ],
+    ),
+    crate_root = "tests/thresholds.rs",
+    edition = "2024",
+    rustc_flags = ["-Adead_code"],
+)
+
+rust_test(
+    name = "scope_review_test",
+    srcs = [
+        "src/scope_review.rs",
+        "tests/scope_review.rs",
+    ],
+    crate_root = "tests/scope_review.rs",
+    edition = "2024",
+)
+
+test_suite(
+    name = "suite",
+    tests = [
+        ":branch_supplement_test",
+        ":gate_test",
+        ":parser_test",
+        ":scope_review_test",
+        ":thresholds_test",
+    ],
+)

@@ -10,10 +10,11 @@ use loopal_secret_client::expand::expand_template;
 use loopal_secret_client::placeholder::{AUTHOR_RE, WIRE_RE};
 use loopal_secret_client::{SecretError, SecretResult};
 use loopal_vault_age::{AgeVault, DiscoveredIdentity, discover, list_initialized_vaults};
-use loopal_vault_api::{AuditSink, NoopAuditSink, Vault};
+use loopal_vault_api::{AuditMetadata, AuditSink, NoopAuditSink, Vault};
 
 #[derive(Clone, Debug)]
 pub struct AuditContext {
+    pub session_id: Option<String>,
     pub agent_name: String,
     pub depth: u32,
     pub tool_name: Option<String>,
@@ -51,11 +52,26 @@ impl HubVaultService {
         &self,
         cwd: &Path,
         name: &str,
-        _ctx: AuditContext,
+        ctx: AuditContext,
     ) -> SecretResult<SecretString> {
-        let vault = self.vault_for(cwd).await?;
-        match vault.get(name).await {
-            Some(s) => Ok(s),
+        let canonical = cwd
+            .canonicalize()
+            .map_err(|e| SecretError::VaultNotFound(cwd.join(format!("(canonicalize: {e})"))))?;
+        let vault = self.vault_for_canonical(&canonical).await?;
+        let metadata = AuditMetadata {
+            session_id: ctx.session_id.as_deref(),
+            cwd: Some(&canonical),
+            agent_name: Some(&ctx.agent_name),
+            depth: Some(ctx.depth),
+            tool_name: ctx.tool_name.as_deref(),
+            ..AuditMetadata::default()
+        };
+        match vault
+            .get_audited(name, &metadata)
+            .await
+            .map_err(|error| SecretError::DecryptFailed(error.to_string()))?
+        {
+            Some(secret) => Ok(secret),
             None => Err(SecretError::SecretNotFound(name.to_string())),
         }
     }
@@ -99,16 +115,20 @@ impl HubVaultService {
         let canonical = cwd
             .canonicalize()
             .map_err(|e| SecretError::VaultNotFound(cwd.join(format!("(canonicalize: {e})"))))?;
-        if let Some(v) = self.vaults.read().await.get(&canonical) {
-            return Ok(v.clone());
+        self.vault_for_canonical(&canonical).await
+    }
+
+    async fn vault_for_canonical(&self, canonical: &Path) -> SecretResult<Arc<AgeVault>> {
+        if let Some(vault) = self.vaults.read().await.get(canonical) {
+            return Ok(vault.clone());
         }
         let mut write = self.vaults.write().await;
-        if let Some(v) = write.get(&canonical) {
-            return Ok(v.clone());
+        if let Some(vault) = write.get(canonical) {
+            return Ok(vault.clone());
         }
-        let arc = Arc::new(self.open_default_vault(&canonical)?);
-        write.insert(canonical, arc.clone());
-        Ok(arc)
+        let vault = Arc::new(self.open_default_vault(canonical)?);
+        write.insert(canonical.to_path_buf(), vault.clone());
+        Ok(vault)
     }
 
     fn open_default_vault(&self, cwd: &Path) -> SecretResult<AgeVault> {

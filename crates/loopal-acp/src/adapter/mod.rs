@@ -6,6 +6,7 @@ mod events;
 mod lifecycle;
 mod permission;
 mod prompt;
+mod question;
 mod session;
 mod snapshot;
 

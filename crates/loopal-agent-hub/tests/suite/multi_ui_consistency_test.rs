@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
-use loopal_agent_hub::{Hub, agent_io, hub_server, start_event_loop};
+use loopal_agent_hub::{Hub, hub_server, start_event_loop};
 use loopal_ipc::TcpTransport;
 use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
@@ -22,7 +22,7 @@ use loopal_protocol::{
 
 async fn make_hub() -> (Arc<Mutex<Hub>>, u16, String) {
     let (raw_tx, raw_rx) = mpsc::channel(16);
-    let hub = Arc::new(Mutex::new(Hub::new(raw_tx.clone())));
+    let hub = crate::permission_support::hub_with_noop_audit(raw_tx.clone());
     let (listener, port, token) = hub_server::start_hub_listener(hub.clone()).await.unwrap();
     let hub_accept = hub.clone();
     let token_for_loop = token.clone();
@@ -151,103 +151,5 @@ async fn user_input_from_one_ui_lands_in_both_ui_streams() {
     }
 }
 
-/// Spawn a task that responds to `agent/permission` relay requests
-/// Send a `hub/permission_response` from `conn` as soon as a
-/// `ToolPermissionRequest` event arrives on `rx` (parsed from
-/// `agent/event` notifications).
-fn approve_first_permission_via_events(
-    conn: Arc<Connection<Listening>>,
-    mut rx: mpsc::Receiver<Incoming>,
-    allow: bool,
-) {
-    tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            let Incoming::Notification { method, params } = msg else {
-                continue;
-            };
-            if method != methods::AGENT_EVENT.name {
-                continue;
-            }
-            let Ok(event) = serde_json::from_value::<AgentEvent>(params) else {
-                continue;
-            };
-            let agent = event
-                .agent_name
-                .as_ref()
-                .map(|q| q.agent.clone())
-                .unwrap_or_else(|| "main".to_string());
-            if let AgentEventPayload::ToolPermissionRequest { id, .. } = event.payload {
-                let _ = conn
-                    .send_request(
-                        methods::HUB_PERMISSION_RESPONSE.name,
-                        json!({"agent_name": agent, "tool_call_id": id, "allow": allow}),
-                    )
-                    .await;
-                return;
-            }
-        }
-    });
-}
-
-#[tokio::test]
-async fn permission_resolved_event_reaches_non_winning_ui() {
-    let (hub, port, token) = make_hub().await;
-
-    let (t1, t2) = loopal_ipc::duplex_pair();
-    let (hub_side, hub_rx) = Connection::new(t1).into_listening();
-    let (agent_side, _agent_rx) = Connection::new(t2).into_listening();
-    hub.lock()
-        .await
-        .registry
-        .register_connection("main", hub_side.clone())
-        .unwrap();
-    // Hub-side IO loop: dispatch agent/permission via pending_relay
-    // (writes pending + emits ToolPermissionRequest event).
-    let dispatcher = std::sync::Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
-        hub.clone(),
-    ));
-    agent_io::spawn_io_loop(hub.clone(), dispatcher, "main", hub_side, hub_rx);
-
-    let (ui_a, rx_a) = connect_ui(port, &token, "tui-A").await;
-    let (_ui_b, mut rx_b) = connect_ui(port, &token, "tui-B").await;
-    tokio::time::sleep(Duration::from_millis(80)).await;
-
-    // UI A approves whatever permission event arrives first.
-    approve_first_permission_via_events(ui_a.clone(), rx_a, true);
-
-    let perm = json!({
-        "tool_call_id": "perm-1",
-        "tool_name": "Bash",
-        "tool_input": {"command": "ls"},
-    });
-    let response = tokio::spawn(async move {
-        agent_side
-            .send_request(methods::AGENT_PERMISSION.name, perm)
-            .await
-    });
-    let requested = next_event_matching(&mut rx_b, |payload| {
-        matches!(payload, AgentEventPayload::ToolPermissionRequest { .. })
-    })
-    .await;
-    let AgentEventPayload::ToolPermissionRequest {
-        id: interaction_id, ..
-    } = requested.payload
-    else {
-        unreachable!()
-    };
-    let resp = response
-        .await
-        .expect("agent permission task panicked")
-        .expect("agent gets permission response");
-    assert_eq!(resp.get("allow").and_then(|v| v.as_bool()), Some(true));
-
-    // UI B (the loser) must observe Resolved for the same opaque interaction.
-    let resolved = next_event_matching(&mut rx_b, |p| {
-        matches!(p, AgentEventPayload::ToolPermissionResolved { .. })
-    })
-    .await;
-    let AgentEventPayload::ToolPermissionResolved { id } = resolved.payload else {
-        panic!();
-    };
-    assert_eq!(id, interaction_id);
-}
+#[path = "multi_ui_consistency_test/permission_resolution.rs"]
+mod permission_resolution;

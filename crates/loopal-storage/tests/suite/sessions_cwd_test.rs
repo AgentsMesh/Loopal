@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use loopal_storage::SessionStore;
+use loopal_storage::{SessionStore, SubAgentRef};
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
@@ -140,4 +140,37 @@ fn test_cwd_normalization_nonexistent_path_fallback() {
         result.is_some(),
         "non-existent path should match by raw string"
     );
+}
+
+#[test]
+fn list_root_sessions_excludes_cross_cwd_sub_agents() {
+    let tmp = TempDir::new().unwrap();
+    let store = SessionStore::with_base_dir(tmp.path().to_path_buf());
+    let parent = store
+        .create_session(Path::new("/parent-project"), "parent")
+        .unwrap();
+    let child = store
+        .create_session(Path::new("/target-project"), "child")
+        .unwrap();
+    let root = store
+        .create_session(Path::new("/target-project"), "root")
+        .unwrap();
+    store
+        .add_sub_agent(
+            &parent.id,
+            SubAgentRef {
+                name: "child".into(),
+                session_id: child.id.clone(),
+                parent: None,
+                model: Some("child".into()),
+            },
+        )
+        .unwrap();
+
+    let roots = store
+        .list_root_sessions_for_cwd(Path::new("/target-project"))
+        .unwrap();
+
+    assert_eq!(roots.len(), 1);
+    assert_eq!(roots[0].id, root.id);
 }

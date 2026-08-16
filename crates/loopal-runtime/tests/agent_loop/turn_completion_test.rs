@@ -100,6 +100,7 @@ pub(crate) fn make_multi_runner(
             frontend,
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: super::noop_protected_effect_audit(),
         },
         fixture.test_session("test-multi"),
         make_test_budget(),

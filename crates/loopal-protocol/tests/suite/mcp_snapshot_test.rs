@@ -1,4 +1,6 @@
-use loopal_protocol::{AgentEventPayload, ControlCommand, McpServerSnapshot};
+use loopal_protocol::{
+    AgentEventPayload, ControlCommand, McpReconnectRequest, McpReconnectResponse, McpServerSnapshot,
+};
 
 fn sample_snapshot() -> McpServerSnapshot {
     McpServerSnapshot {
@@ -54,6 +56,23 @@ fn test_control_command_mcp_reconnect() {
     } else {
         panic!("expected McpReconnect");
     }
+}
+
+#[test]
+fn reconnect_rpc_types_roundtrip() {
+    let request: McpReconnectRequest = serde_json::from_value(
+        serde_json::to_value(McpReconnectRequest {
+            server: "server".into(),
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(request.server, "server");
+    let response: McpReconnectResponse = serde_json::from_value(
+        serde_json::to_value(McpReconnectResponse { connected: true }).unwrap(),
+    )
+    .unwrap();
+    assert!(response.connected);
 }
 
 #[test]

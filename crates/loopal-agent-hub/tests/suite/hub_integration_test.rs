@@ -5,12 +5,12 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::Hub;
 use loopal_agent_hub::hub_server;
+use loopal_agent_hub::{Hub, UiSession};
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, UiCapabilities};
 use serde_json::json;
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
@@ -27,6 +27,10 @@ fn spawn_mock_agent(conn: Arc<Connection<Listening>>, mut rx: mpsc::Receiver<Inc
             }
         }
     });
+}
+
+async fn connect_control_ui(hub: Arc<Mutex<Hub>>) -> UiSession {
+    UiSession::connect(hub, "control-ui", UiCapabilities::NONE).await
 }
 
 include!("hub_integration_test/registration_routing.rs");

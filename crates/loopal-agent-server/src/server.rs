@@ -6,19 +6,21 @@ use std::sync::Arc;
 
 use tracing::info;
 
+use crate::dispatch::{RpcErrorPayload, dispatch_simple, respond_with};
+use crate::server_init::wait_for_initialize_with_token;
+use crate::session_hub::SessionHub;
 use loopal_ipc::StdioTransport;
 use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::transport::Transport;
-use loopal_protocol::AgentCompletion;
-
-use crate::dispatch::{RpcErrorPayload, dispatch_simple, respond_with};
-use crate::server_init::wait_for_initialize_with_token;
-use crate::session_hub::SessionHub;
 
 pub async fn run_agent_server() -> anyhow::Result<()> {
     info!("agent server starting (stdio mode)");
     let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
+    run_agent_server_on_transport(transport).await
+}
+
+async fn run_agent_server_on_transport(transport: Arc<dyn Transport>) -> anyhow::Result<()> {
     let (connection, incoming_rx) = Connection::new(transport).into_listening();
     let hub = Arc::new(SessionHub::new());
     run_connection(connection, incoming_rx, &hub).await
@@ -27,11 +29,18 @@ pub async fn run_agent_server() -> anyhow::Result<()> {
 pub async fn run_agent_server_with_mock(mock_path: &str) -> anyhow::Result<()> {
     info!(mock_path, "agent server starting with mock provider");
     let provider = crate::mock_loader::load_mock_provider(mock_path)?;
+    let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
+    run_agent_server_with_mock_provider(provider, transport).await
+}
+
+async fn run_agent_server_with_mock_provider(
+    provider: Arc<dyn loopal_provider_api::Provider>,
+    transport: Arc<dyn Transport>,
+) -> anyhow::Result<()> {
     let cwd = std::env::current_dir().unwrap_or_default();
     let session_dir = std::env::var_os("LOOPAL_TEST_SESSION_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir().join("loopal-test-sessions"));
-    let transport: Arc<dyn Transport> = Arc::new(StdioTransport::from_std());
     crate::test_server::run_server_for_test(transport, provider, cwd, session_dir).await
 }
 
@@ -50,7 +59,7 @@ pub(crate) async fn dispatch_loop(
     hub: &SessionHub,
     is_production: bool,
 ) -> anyhow::Result<()> {
-    let output = loop {
+    let exit = loop {
         let Some(msg) = incoming_rx.recv().await else {
             info!("connection closed");
             break None;
@@ -71,8 +80,8 @@ pub(crate) async fn dispatch_loop(
             .await?;
             match outcome {
                 SessionOutcome::ReadyForStart => continue,
-                SessionOutcome::Exit(output) => {
-                    break output;
+                SessionOutcome::Exit(output, redaction_seed, result_limit) => {
+                    break Some((output, redaction_seed, result_limit));
                 }
             }
         }
@@ -83,7 +92,15 @@ pub(crate) async fn dispatch_loop(
             break None;
         }
     };
-    send_agent_completed(&connection, output.as_ref()).await;
+    let (output, redaction_seed, result_limit) = exit.unwrap_or_else(|| {
+        (
+            None,
+            loopal_output_guard::FinalSinkRedactionSeed::new(),
+            loopal_output_guard::MAX_AGENT_COMPLETION_RESULT_BYTES,
+        )
+    });
+    crate::agent_completion_wire::send(&connection, output.as_ref(), &redaction_seed, result_limit)
+        .await;
     info!("server shutting down");
     Ok(())
 }
@@ -119,16 +136,24 @@ async fn run_session(
         crate::session_forward::ForwardResult::Done(output) => output,
         crate::session_forward::ForwardResult::Shutdown => {
             info!("active session received shutdown, server exiting");
-            return Ok(SessionOutcome::Exit(None));
+            return Ok(SessionOutcome::Exit(
+                None,
+                handle.redaction_seed,
+                handle.completion_result_limit,
+            ));
         }
         crate::session_forward::ForwardResult::NewStart { .. } => {
             unreachable!("agent/start chaining is exhausted above")
         }
     };
 
-    if handle.lifecycle == loopal_runtime::LifecycleMode::Ephemeral {
+    if handle.lifecycle.is_one_shot() {
         info!("ephemeral session complete, server exiting");
-        Ok(SessionOutcome::Exit(agent_output))
+        Ok(SessionOutcome::Exit(
+            agent_output,
+            handle.redaction_seed,
+            handle.completion_result_limit,
+        ))
     } else {
         info!("persistent session ended, ready for next");
         Ok(SessionOutcome::ReadyForStart)
@@ -137,29 +162,11 @@ async fn run_session(
 
 enum SessionOutcome {
     ReadyForStart,
-    Exit(Option<loopal_error::AgentOutput>),
-}
-
-async fn send_agent_completed(
-    connection: &Connection<Listening>,
-    output: Option<&loopal_error::AgentOutput>,
-) {
-    let completion = match output {
-        Some(output) => AgentCompletion {
-            reason: output.terminate_reason.as_str().into(),
-            result: Some(output.result.clone()),
-        },
-        None => AgentCompletion {
-            reason: "shutdown".into(),
-            result: None,
-        },
-    };
-    let _ = connection
-        .send_notification(
-            methods::AGENT_COMPLETED.name,
-            serde_json::to_value(completion).expect("AgentCompletion is serializable"),
-        )
-        .await;
+    Exit(
+        Option<loopal_error::AgentOutput>,
+        loopal_output_guard::FinalSinkRedactionSeed,
+        usize,
+    ),
 }
 
 // reason: start_session responds OK to `id` on success but `?`-early-exits
@@ -186,3 +193,7 @@ async fn start_session_or_respond_error(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "server_tests.rs"]
+mod tests;

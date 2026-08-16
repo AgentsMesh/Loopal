@@ -6,12 +6,15 @@ use tokio::sync::Mutex;
 
 use crate::dispatch::dispatch_handlers;
 use crate::pending_relay::PendingRemoteQuestionInfo;
-use crate::uplink::TrustedMetaHubContext;
+use crate::request_principal::TrustedMetaHubPrincipal;
 use crate::{Hub, HubUplink};
 
 mod admission;
 mod cleanup;
 mod response;
+#[cfg(test)]
+#[path = "remote_relay_tests.rs"]
+mod tests;
 
 pub(crate) use cleanup::{
     cancel_destination_detached, cancel_remote_origins, resolve_remote_records,
@@ -20,13 +23,13 @@ pub(crate) use cleanup::{
 pub(crate) async fn handle(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    trusted: &TrustedMetaHubContext,
+    trusted: &TrustedMetaHubPrincipal,
 ) -> Result<Value, String> {
     let active_uplink = {
         let h = hub.lock().await;
         h.uplink
             .clone()
-            .filter(|uplink| trusted.matches(uplink))
+            .filter(|uplink| trusted.matches_connection(uplink.connection()))
             .ok_or_else(|| "remote relay arrived on a stale uplink generation".to_string())?
     };
     match params["operation"].as_str().unwrap_or("") {

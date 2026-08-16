@@ -9,7 +9,7 @@ use tokio::sync::{Mutex, mpsc};
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel(32);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    (crate::permission_support::hub_with_noop_audit(tx), rx)
 }
 
 #[tokio::test]
@@ -22,20 +22,22 @@ async fn stale_response_and_old_timer_cannot_resolve_reused_logical_id() {
     let ui = UiSession::connect(hub.clone(), "desktop", UiCapabilities::ALL).await;
     let (agent, _agent_rx) = hub_server::connect_local(hub.clone(), "main");
     let first = request_permission(agent.clone());
-    let old_token = crate::permission_interaction_id(&hub, "main", "reused").await;
-    ui.client.respond_permission("main", &old_token, true).await;
+    let old = crate::permission_interaction(&hub, "main", "reused").await;
+    ui.client
+        .respond_permission("main", &old.id, Some(old.digest), true)
+        .await;
     assert_eq!(first.await.unwrap().unwrap()["allow"], true);
 
     hub.lock()
         .await
         .set_pending_interaction_timeout(Duration::from_secs(2));
     let second = request_permission(agent);
-    let new_token = crate::permission_interaction_id(&hub, "main", "reused").await;
-    assert_ne!(old_token, new_token);
+    let new = crate::permission_interaction(&hub, "main", "reused").await;
+    assert_ne!(old.id, new.id);
     tokio::time::sleep(Duration::from_millis(350)).await;
     assert_eq!(
         crate::permission_interaction_id(&hub, "main", "reused").await,
-        new_token
+        new.id
     );
 
     let stale = ui
@@ -43,7 +45,7 @@ async fn stale_response_and_old_timer_cannot_resolve_reused_logical_id() {
         .connection()
         .send_request(
             methods::HUB_PERMISSION_RESPONSE.name,
-            json!({"agent_name": "main", "tool_call_id": old_token, "allow": false}),
+            json!({"agent_name": "main", "tool_call_id": old.id, "allow": false}),
         )
         .await
         .unwrap();
@@ -54,7 +56,9 @@ async fn stale_response_and_old_timer_cannot_resolve_reused_logical_id() {
             .pending_permissions
             .contains_key(&("main".into(), "reused".into()))
     );
-    ui.client.respond_permission("main", &new_token, true).await;
+    ui.client
+        .respond_permission("main", &new.id, Some(new.digest), true)
+        .await;
     assert_eq!(second.await.unwrap().unwrap()["allow"], true);
 }
 
@@ -115,9 +119,7 @@ fn request_permission(
         agent
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({
-                    "tool_call_id": "reused", "tool_name": "Bash", "tool_input": {}
-                }),
+                crate::permission_request("reused", "Bash", json!({})),
             )
             .await
     })

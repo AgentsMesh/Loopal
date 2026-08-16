@@ -8,6 +8,24 @@ use serde_json::Value;
 use tracing::Instrument;
 
 use crate::provider::McpProvider;
+use crate::tool_result_text::{block_to_text, call_result_to_response};
+
+pub const MCP_SECRET_ARG_REJECTION: &str =
+    "MCP tool arguments cannot contain secret placeholders; configure the MCP server instead";
+
+pub fn contains_secret_placeholder(value: &Value) -> bool {
+    match value {
+        Value::String(value) => {
+            loopal_secret_client::AUTHOR_RE.is_match(value)
+                || loopal_secret_client::WIRE_RE.is_match(value)
+        }
+        Value::Array(values) => values.iter().any(contains_secret_placeholder),
+        Value::Object(values) => values
+            .iter()
+            .any(|(key, value)| contains_secret_text(key) || contains_secret_placeholder(value)),
+        _ => false,
+    }
+}
 
 pub struct McpToolAdapter {
     definition: ToolDefinition,
@@ -51,6 +69,10 @@ impl Tool for McpToolAdapter {
         &[]
     }
 
+    fn precheck(&self, input: &Value) -> Option<String> {
+        contains_secret_placeholder(input).then(|| MCP_SECRET_ARG_REJECTION.into())
+    }
+
     async fn execute(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
         let mcp_span =
             tracing::info_span!("mcp_tool_call", mcp.tool = self.definition.name.as_str());
@@ -72,105 +94,21 @@ impl Tool for McpToolAdapter {
 }
 
 fn convert_tool_result(result: &CallToolResult) -> ToolResult {
-    let parts: Vec<String> = result.content.iter().filter_map(content_to_text).collect();
+    let response = call_result_to_response(result);
+    let parts: Vec<String> = response.content.iter().map(block_to_text).collect();
 
     ToolResult {
         content: parts.join("\n"),
         images: Vec::new(),
-        is_error: result.is_error.unwrap_or(false),
+        is_error: response.is_error,
         metadata: None,
     }
 }
 
-fn content_to_text(content: &rmcp::model::Content) -> Option<String> {
-    use rmcp::model::{RawContent, ResourceContents};
-
-    match &content.raw {
-        RawContent::Text(t) => Some(t.text.clone()),
-        RawContent::Image(img) => Some(format!(
-            "![image](data:{};base64,{})",
-            img.mime_type, img.data
-        )),
-        RawContent::Audio(audio) => Some(format!("[audio: {}]", audio.mime_type)),
-        RawContent::Resource(res) => match &res.resource {
-            ResourceContents::TextResourceContents { uri, text, .. } => {
-                Some(format!("[resource {uri}]\n{text}"))
-            }
-            ResourceContents::BlobResourceContents { uri, .. } => {
-                Some(format!("[binary resource: {uri}]"))
-            }
-        },
-        RawContent::ResourceLink(link) => Some(format!("[resource: {}]", link.uri)),
-    }
+fn contains_secret_text(value: &str) -> bool {
+    loopal_secret_client::AUTHOR_RE.is_match(value) || loopal_secret_client::WIRE_RE.is_match(value)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::local_provider::LocalMcpProvider;
-    use crate::manager::McpManager;
-    use tokio::sync::RwLock;
-
-    fn make_adapter() -> McpToolAdapter {
-        let definition = ToolDefinition {
-            name: "test_tool".to_string(),
-            description: "A test tool for unit testing".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string" }
-                }
-            }),
-        };
-        let manager = Arc::new(RwLock::new(McpManager::default()));
-        let provider: Arc<dyn McpProvider> = Arc::new(LocalMcpProvider::new(manager));
-        McpToolAdapter::new(definition, "test_server".to_string(), provider)
-    }
-
-    #[test]
-    fn test_name_returns_definition_name() {
-        let adapter = make_adapter();
-        assert_eq!(adapter.name(), "test_tool");
-    }
-
-    #[test]
-    fn test_description_returns_definition_description() {
-        let adapter = make_adapter();
-        assert_eq!(adapter.description(), "A test tool for unit testing");
-    }
-
-    #[test]
-    fn test_parameters_schema_returns_input_schema() {
-        let adapter = make_adapter();
-        let schema = adapter.parameters_schema();
-        assert_eq!(schema["type"], "object");
-        assert!(schema["properties"]["query"].is_object());
-    }
-
-    #[test]
-    fn test_permission_returns_supervised() {
-        let adapter = make_adapter();
-        assert_eq!(adapter.permission(), PermissionLevel::Write);
-    }
-
-    #[test]
-    fn test_construction_stores_server_name() {
-        let adapter = make_adapter();
-        assert_eq!(adapter.server_name, "test_server");
-    }
-
-    #[test]
-    fn test_construction_with_empty_schema() {
-        let definition = ToolDefinition {
-            name: "minimal".to_string(),
-            description: String::new(),
-            input_schema: serde_json::json!({}),
-        };
-        let manager = Arc::new(RwLock::new(McpManager::default()));
-        let provider: Arc<dyn McpProvider> = Arc::new(LocalMcpProvider::new(manager));
-        let adapter = McpToolAdapter::new(definition, "srv".to_string(), provider);
-        assert_eq!(adapter.name(), "minimal");
-        assert_eq!(adapter.description(), "");
-        assert_eq!(adapter.parameters_schema(), serde_json::json!({}));
-    }
-}
+#[path = "tool_adapter_tests.rs"]
+mod tests;

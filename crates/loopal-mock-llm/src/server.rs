@@ -3,6 +3,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{Result, ensure};
+use serde::Deserialize;
+use serde_json::Value;
 use serde_json::json;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -30,13 +32,17 @@ pub async fn run(config: ServerConfig) -> Result<()> {
         json!({
             "baseUrl": base_url,
             "protocols": ["anthropic", "openai_responses", "openai_compat", "google"],
-            "version": 2
+            "version": 3
         })
     );
     serve(listener, config.scenario, config.api_key).await
 }
 
 pub async fn serve(listener: TcpListener, scenario: Scenario, api_key: String) -> Result<()> {
+    ensure!(
+        listener.local_addr()?.ip().is_loopback(),
+        "mock LLM must bind to loopback"
+    );
     let state = Arc::new(ServerState::new(scenario, api_key));
     loop {
         let (stream, _) = listener.accept().await?;
@@ -94,6 +100,7 @@ async fn handle_connection(mut stream: TcpStream, state: Arc<ServerState>) -> Re
             )
             .await
         }
+        ("POST", "/__mock/calls") => write_append_calls(&mut stream, &state, &request.body).await,
         ("POST", _) => {
             let Some(route) = route(&request.path) else {
                 return write_json(
@@ -111,6 +118,51 @@ async fn handle_connection(mut stream: TcpStream, state: Arc<ServerState>) -> Re
                 &mut stream,
                 404,
                 &json!({"error": "unknown mock LLM endpoint"}),
+                &BTreeMap::new(),
+            )
+            .await
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AppendCallsRequest {
+    calls: Vec<Value>,
+}
+
+async fn write_append_calls(
+    stream: &mut TcpStream,
+    state: &ServerState,
+    body: &[u8],
+) -> Result<()> {
+    let request = match serde_json::from_slice::<AppendCallsRequest>(body) {
+        Ok(request) => request,
+        Err(error) => {
+            return write_json(
+                stream,
+                400,
+                &json!({"error": format!("invalid append request: {error}")}),
+                &BTreeMap::new(),
+            )
+            .await;
+        }
+    };
+    match state.append_calls(request.calls).await {
+        Ok((appended, remaining)) => {
+            write_json(
+                stream,
+                200,
+                &json!({"appended": appended, "remaining": remaining}),
+                &BTreeMap::new(),
+            )
+            .await
+        }
+        Err(error) => {
+            write_json(
+                stream,
+                400,
+                &json!({"error": error.to_string()}),
                 &BTreeMap::new(),
             )
             .await

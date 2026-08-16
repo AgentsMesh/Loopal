@@ -6,15 +6,16 @@ import {
   type SessionDetail,
   type SessionStatus,
   type SessionSummary,
+  type WorkflowRunSummary,
 } from '../../../../shared/contracts'
 import { LoopalEventProjector } from '../projections/loopal-event-projector'
 import { reduceAgentStatus } from '../projections/loopal-agent-status-reducer'
-import { projectModifiedFiles } from '../projections/loopal-artifact-projection'
 import { LoopalLiveAttention } from '../attention/loopal-live-attention'
 import { loadSessionDetail } from '../sessions/loopal-session-snapshot'
 import { LoopalMetaHubWatcher } from '../federation/loopal-metahub-watcher'
 import { type SessionRuntimeHandle } from './session-runtime-registry'
 import { LoopalSessionRefresh } from './loopal-session-refresh'
+import { mergeLiveArtifacts, reduceLiveWorkflow } from './loopal-live-session-projections'
 interface LiveSessionSink {
   event(event: DesktopEvent): void
   summary(summary: SessionSummary): void
@@ -44,6 +45,7 @@ export class LoopalLiveSession {
       overflow: () => this.refreshes.requestImmediately(),
       attention: (kind, value, agentId) => this.attention.accept(kind, value, agentId),
       artifacts: (paths, agentId) => this.recordArtifacts(paths, agentId),
+      workflow: (summary) => this.updateWorkflow(summary),
     })
     this.metaHub = new LoopalMetaHubWatcher(
       runtime.host, now, () => this.detailValue?.metaHub, () => this.refreshes.request(true),
@@ -115,17 +117,13 @@ export class LoopalLiveSession {
     return this.attention.retire()
   }
   private recordArtifacts(paths: readonly string[], agentId: string): void {
-    const detail = this.detail
-    const known = new Set(detail.artifacts.map((artifact) => artifact.id))
-    const created = projectModifiedFiles(
+    const result = mergeLiveArtifacts(
+      this.detail,
       this.summaryValue.id, agentId, paths, this.now().toISOString(),
-    ).filter((artifact) => !known.has(artifact.id))
-    if (created.length === 0) return
-    this.detailValue = {
-      ...detail,
-      artifacts: [...detail.artifacts, ...created],
-    }
-    for (const artifact of created) this.sink.event({ type: 'artifact_created', artifact })
+    )
+    if (!result) return
+    this.detailValue = result.detail
+    for (const artifact of result.created) this.sink.event({ type: 'artifact_created', artifact })
   }
 
   private async refreshSnapshot(emit: boolean): Promise<void> {
@@ -174,6 +172,18 @@ export class LoopalLiveSession {
       )),
     }
     this.sink.event({ type: 'session_detail_replaced', detail: this.detailValue })
+  }
+
+  private updateWorkflow(summary: WorkflowRunSummary): void {
+    if (!this.active) return
+    const result = reduceLiveWorkflow(this.detailValue, summary)
+    if (result.kind === 'gap') {
+      this.refreshes.requestImmediately()
+      return
+    }
+    if (result.kind === 'noop') return
+    this.detailValue = result.detail
+    this.sink.event({ type: 'session_detail_replaced', detail: result.detail })
   }
 
   private update(status: SessionStatus, attention?: SessionSummary['attention']): void {

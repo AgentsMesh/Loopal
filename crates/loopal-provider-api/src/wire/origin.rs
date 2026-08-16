@@ -25,6 +25,11 @@ pub enum MessageOrigin {
         name: String,
         from: String,
     },
+    WorkflowResult {
+        run_id: String,
+        terminal_revision: u64,
+        state: String,
+    },
     /// Goal-kickoff continuation envelope produced by `goal_continuation_check`.
     GoalContinuation,
     /// LoopDetector abort compensation (synthetic tool_result stubs).
@@ -58,6 +63,7 @@ impl MessageOrigin {
                 | Self::Scheduled
                 | Self::Agent { .. }
                 | Self::Channel { .. }
+                | Self::WorkflowResult { .. }
         )
     }
 

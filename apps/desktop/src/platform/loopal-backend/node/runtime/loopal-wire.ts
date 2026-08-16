@@ -34,6 +34,7 @@ const WireConversationSchema = z.object({
   thinking_active: z.boolean().default(false),
   pending_permission: z.object({
     id: z.string(), name: z.string(), input: z.unknown(), cursor: z.string().optional(),
+    intent_digest: z.string().regex(/^sha256:[0-9a-f]{64}$/).nullable().optional(),
   }).nullable().optional(),
   pending_question: z.object({
     id: z.string(),
@@ -102,6 +103,38 @@ const WireGoalSchema = z.object({
   goal_id: z.string(), objective: z.string(), status: z.string(),
   created_at: z.string(), updated_at: z.string(),
 })
+const WireWorkflowIdSchema = z.string()
+  .max(128)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/u)
+const WireWorkflowCountSchema = z.number().int().nonnegative().max(4_294_967_295)
+const WireWorkflowTimestampSchema = z.number().int().nonnegative().max(8_640_000_000_000_000)
+const WireWorkflowCountsSchema = z.object({
+  pending: WireWorkflowCountSchema,
+  ready: WireWorkflowCountSchema,
+  active: WireWorkflowCountSchema,
+  succeeded: WireWorkflowCountSchema,
+  failed: WireWorkflowCountSchema,
+  cancelled: WireWorkflowCountSchema,
+  skipped: WireWorkflowCountSchema,
+})
+export const WireWorkflowRunSummarySchema = z.object({
+  id: WireWorkflowIdSchema,
+  run_goal: z.string(),
+  state: z.enum([
+    'planned', 'validated', 'running', 'cancelling', 'succeeded', 'failed', 'cancelled',
+  ]),
+  revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  output_node: WireWorkflowIdSchema,
+  counts: WireWorkflowCountsSchema,
+  created_at_unix_ms: WireWorkflowTimestampSchema,
+  updated_at_unix_ms: WireWorkflowTimestampSchema,
+})
+export type WireWorkflowRunSummary = z.infer<typeof WireWorkflowRunSummarySchema>
+
+const WireWorkflowRunsSchema = z.object({
+  active: z.array(WireWorkflowRunSummarySchema).default([]),
+  recent: z.array(WireWorkflowRunSummarySchema).default([]),
+})
 
 export const ViewSnapshotSchema = z.object({
   rev: z.number().int().nonnegative(),
@@ -111,6 +144,7 @@ export const ViewSnapshotSchema = z.object({
     crons: z.array(WireCronSchema).default([]),
     bg_tasks: z.record(z.string(), WireBackgroundTaskSchema).default({}),
     mcp_status: z.array(WireMcpSchema).nullable().optional(),
+    workflows: WireWorkflowRunsSchema.default({ active: [], recent: [] }),
     thread_goal: WireGoalSchema.nullable().optional(),
     hub_degraded_since_ms: z.number().nonnegative().nullable().optional(),
   }),

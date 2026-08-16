@@ -109,5 +109,11 @@ pub fn validate_request(
             expected.image_block_count.unwrap_or(0)
         ));
     }
+    if let Some(matchers) = &expected.request_metadata {
+        let metadata = body.get("metadata");
+        for matcher in matchers {
+            errors.extend(matcher.mismatch(metadata));
+        }
+    }
     errors
 }

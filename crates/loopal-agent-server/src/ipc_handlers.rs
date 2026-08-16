@@ -3,16 +3,13 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use tracing::{debug, info, warn};
-use uuid::Uuid;
+use tracing::{debug, warn};
 
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_ipc::protocol::methods;
 use loopal_ipc::rpc_error::RpcError;
 use loopal_protocol::{DEFAULT_INTERACTION_RPC_TIMEOUT, Question, UserQuestionResponse};
-use loopal_runtime::frontend::permission_handler::{PermissionHandler, PermissionOutcome};
 use loopal_runtime::frontend::question_handler::{AskOptions, QuestionHandler, QuestionOutcome};
-use loopal_runtime::frontend::traits::{PlanApproval, PlanApprovalCancellationReason};
 
 use crate::session_hub::SharedSession;
 
@@ -48,66 +45,6 @@ async fn send_interaction_request(
 async fn primary_connection(session: &SessionRef) -> Option<Arc<Connection<Listening>>> {
     let snap = session.read().await.clone();
     snap.primary_connection().await
-}
-
-pub struct IpcPermissionHandler {
-    session: SessionRef,
-    request_timeout: Duration,
-}
-
-impl IpcPermissionHandler {
-    pub fn new(session: SessionRef) -> Self {
-        Self {
-            session,
-            request_timeout: DEFAULT_INTERACTION_RPC_TIMEOUT,
-        }
-    }
-
-    #[cfg(test)]
-    fn with_timeout(session: SessionRef, request_timeout: Duration) -> Self {
-        Self {
-            session,
-            request_timeout,
-        }
-    }
-}
-
-#[async_trait]
-impl PermissionHandler for IpcPermissionHandler {
-    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
-        info!(tool = name, "requesting permission via IPC");
-        let Some(conn) = primary_connection(&self.session).await else {
-            warn!(tool = name, "permission denied: no primary connection");
-            return PermissionOutcome::deny("no primary connection");
-        };
-        let params = serde_json::json!({
-            "tool_call_id": id,
-            "tool_name": name,
-            "tool_input": input,
-        });
-        match send_interaction_request(
-            &conn,
-            methods::AGENT_PERMISSION.name,
-            params,
-            self.request_timeout,
-        )
-        .await
-        {
-            Ok(value) => {
-                let allow = value.get("allow").and_then(Value::as_bool).unwrap_or(false);
-                info!(tool = name, allow, "permission response received");
-                if allow {
-                    PermissionOutcome::allow()
-                } else {
-                    PermissionOutcome::deny("user denied")
-                }
-            }
-            Err(e) => {
-                warn!(tool = name, error = %e, "permission IPC failed");
-                PermissionOutcome::deny(format!("ipc failure: {e}"))
-            }
-        }
-    }
 }
 
 pub struct IpcQuestionHandler {
@@ -175,74 +112,20 @@ impl QuestionHandler for IpcQuestionHandler {
     }
 }
 
-pub async fn request_plan_approval(
-    session: &SessionRef,
-    plan_content: &str,
-    plan_path: &str,
-) -> PlanApproval {
-    request_plan_approval_with_timeout(
-        session,
-        plan_content,
-        plan_path,
-        DEFAULT_INTERACTION_RPC_TIMEOUT,
-    )
-    .await
-}
+mod permission;
+mod plan;
 
-async fn request_plan_approval_with_timeout(
-    session: &SessionRef,
-    plan_content: &str,
-    plan_path: &str,
-    request_timeout: Duration,
-) -> PlanApproval {
-    let Some(conn) = primary_connection(session).await else {
-        return PlanApproval::Cancelled(PlanApprovalCancellationReason::Transport);
-    };
-    let params = serde_json::json!({
-        "request_id": Uuid::new_v4().to_string(),
-        "plan_content": plan_content,
-        "plan_path": plan_path,
-    });
-    let value = match send_interaction_request(
-        &conn,
-        methods::AGENT_PLAN_APPROVAL.name,
-        params,
-        request_timeout,
-    )
-    .await
-    {
-        Ok(value) => value,
-        Err(InteractionRpcError::TimedOut) => {
-            warn!("plan approval IPC timed out");
-            return PlanApproval::Cancelled(PlanApprovalCancellationReason::TimedOut);
-        }
-        Err(error) => {
-            warn!(%error, "plan approval IPC failed");
-            return PlanApproval::Cancelled(PlanApprovalCancellationReason::Transport);
-        }
-    };
-    match value.get("decision").and_then(Value::as_str) {
-        Some("approve") => PlanApproval::Approve,
-        Some("cancelled") => PlanApproval::Cancelled(parse_plan_cancellation_reason(&value)),
-        Some("approve_with_edits") => value
-            .get("edited_plan")
-            .and_then(Value::as_str)
-            .map(|value| PlanApproval::ApproveWithEdits(value.to_string()))
-            .unwrap_or(PlanApproval::Reject),
-        _ => PlanApproval::Reject,
-    }
-}
+pub use permission::IpcPermissionHandler;
+pub use plan::request_plan_approval;
 
-fn parse_plan_cancellation_reason(value: &Value) -> PlanApprovalCancellationReason {
-    match value.get("reason").and_then(Value::as_str) {
-        Some("interrupted") => PlanApprovalCancellationReason::Interrupted,
-        Some("timed_out") => PlanApprovalCancellationReason::TimedOut,
-        Some("superseded") => PlanApprovalCancellationReason::Superseded,
-        Some("transport") => PlanApprovalCancellationReason::Transport,
-        _ => PlanApprovalCancellationReason::Unavailable,
-    }
-}
-
+#[cfg(test)]
+use permission::permission_outcome_from_response;
+#[cfg(test)]
+#[path = "ipc_handlers/permission_response_tests.rs"]
+mod permission_response_tests;
+#[cfg(test)]
+#[path = "ipc_handlers/plan_tests.rs"]
+mod plan_tests;
 #[cfg(test)]
 #[path = "ipc_handlers/tests.rs"]
 mod tests;

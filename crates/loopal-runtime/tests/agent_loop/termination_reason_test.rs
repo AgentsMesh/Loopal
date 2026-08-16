@@ -39,7 +39,7 @@ async fn interrupted_ephemeral_turn_returns_aborted_with_partial_output() {
             chunks::text(" must not arrive"),
             chunks::done(),
         ]])
-        .messages(vec![Message::user("work")])
+        .prompt(vec![Message::user("work")])
         .lifecycle(LifecycleMode::Ephemeral)
         .llm_chunk_delay(Duration::from_millis(500))
         .build()
@@ -73,7 +73,7 @@ async fn new_input_after_interrupt_supersedes_aborted_state() {
             ],
             chunks::text_turn("recovered result"),
         ])
-        .messages(vec![Message::user("first")])
+        .prompt(vec![Message::user("first")])
         .lifecycle(LifecycleMode::Ephemeral)
         .llm_chunk_delay(Duration::from_millis(500))
         .build()
@@ -121,7 +121,7 @@ async fn fatal_error_after_partial_tool_round_is_error_with_partial_output() {
     ];
     let harness = HarnessBuilder::new()
         .calls(calls)
-        .messages(vec![Message::user("read then answer")])
+        .prompt(vec![Message::user("read then answer")])
         .lifecycle(LifecycleMode::Ephemeral)
         .build()
         .await;

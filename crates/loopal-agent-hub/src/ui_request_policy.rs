@@ -1,14 +1,14 @@
 use loopal_ipc::protocol::methods;
 
-pub(super) fn is_ui_request(method: &str) -> bool {
+pub(crate) fn is_ui_request(method: &str) -> bool {
     UI_REQUEST_METHODS.contains(&method)
 }
 
-pub(super) fn is_control_request(method: &str) -> bool {
+pub(crate) fn is_control_request(method: &str) -> bool {
     CONTROL_REQUEST_METHODS.contains(&method)
 }
 
-pub(super) fn is_recovery_request(method: &str) -> bool {
+pub(crate) fn is_recovery_request(method: &str) -> bool {
     RECOVERY_REQUEST_METHODS.contains(&method)
 }
 

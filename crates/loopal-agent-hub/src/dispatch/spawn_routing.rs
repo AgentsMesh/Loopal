@@ -1,11 +1,3 @@
-//! Entry handlers for `hub/spawn_agent` (in-hub) and
-//! `hub/spawn_remote_agent` (cross-hub-receiver).
-//!
-//! In-hub spawn assumes shared filesystem: caller may pass `cwd` and
-//! `fork_context`. Cross-hub spawn is forbidden from carrying those —
-//! the receiver uses its own `Hub.default_cwd` and rejects fork_context
-//! / resume. Cross-hub forwarding lives in `cross_hub_forward.rs`.
-
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -13,166 +5,76 @@ use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::hub::Hub;
+use crate::request_principal::{AgentPrincipal, TrustedMetaHubPrincipal};
+use crate::spawn_manager::PreparedSpawn;
 
-/// In-hub spawn entry point. If `target_hub` is set, forward to MetaHub
-/// after rejecting any filesystem-coupled fields (cwd / fork_context /
-/// resume). Otherwise spawn locally.
+#[cfg(test)]
+#[path = "spawn_routing_tests.rs"]
+mod tests;
+
 pub async fn handle_spawn_agent(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    from_agent: &str,
+    principal: &AgentPrincipal,
 ) -> Result<Value, String> {
     if let Some(target) =
         super::spawn_parent_policy::normalize_target_hub_value(params.get("target_hub"))?
     {
-        // Mirror the agent-name check in cross_hub_forward::preflight: a
-        // hub identifier with '/' would be ambiguous with QualifiedAddress
-        // multi-hop encoding (`hub-c/hub-d/agent`) — reject up front.
         if target.contains('/') {
             return Err(format!(
                 "'target_hub' cannot contain '/' (cross-hub address encoding), got: {target}"
             ));
         }
-        let own_hub = hub
-            .lock()
-            .await
-            .uplink
-            .as_ref()
-            .map(|u| u.hub_name().to_string());
+        let (own_hub, max_depth) = {
+            let locked = hub.lock().await;
+            (
+                locked
+                    .uplink
+                    .as_ref()
+                    .map(|uplink| uplink.hub_name().to_string()),
+                locked.max_agent_depth,
+            )
+        };
         if !super::spawn_parent_policy::is_self_target(own_hub.as_deref(), &target) {
-            let mut cross_params = params;
-            if let Some(obj) = cross_params.as_object_mut() {
-                obj.insert("target_hub".into(), Value::String(target));
-            }
+            let mut forwarded =
+                super::spawn_authority::prepare_cross_hub_payload(&params, principal, max_depth)?;
+            forwarded["target_hub"] = Value::String(target);
             return super::cross_hub_forward::forward_cross_hub_spawn(
                 hub,
-                cross_params,
-                from_agent,
+                forwarded,
+                &principal.execution,
             )
             .await;
         }
-        let mut local_params = params;
-        if let Some(obj) = local_params.as_object_mut() {
-            obj.remove("target_hub");
-        }
-        return spawn_local(hub, local_params, from_agent).await;
     }
-    let mut local_params = params;
-    if let Some(obj) = local_params.as_object_mut() {
-        obj.remove("target_hub");
+    let max_depth = hub.lock().await.max_agent_depth;
+    let mut local = params;
+    if let Some(object) = local.as_object_mut() {
+        object.remove("target_hub");
     }
-    spawn_local(hub, local_params, from_agent).await
+    let prepared = super::spawn_authority::prepare_local(&local, principal, max_depth)?;
+    spawn_via_manager(hub.clone(), prepared).await
 }
 
-async fn spawn_local(
-    hub: &Arc<Mutex<Hub>>,
-    params: Value,
-    from_agent: &str,
-) -> Result<Value, String> {
-    let name = params["name"]
-        .as_str()
-        .ok_or("missing 'name' field")?
-        .to_string();
-    let cwd = params["cwd"].as_str().unwrap_or(".").to_string();
-    let model = params["model"].as_str().map(String::from);
-    let prompt = params["prompt"].as_str().map(String::from);
-    let permission_mode = params["permission_mode"].as_str().map(String::from);
-    let decision_mode = params["decision_mode"].as_str().map(String::from);
-    let agent_type = params["agent_type"].as_str().map(String::from);
-    let depth = params["depth"].as_u64().map(|v| v as u32);
-    let fork_context = params.get("fork_context").cloned();
-    let no_sandbox = params["no_sandbox"].as_bool().unwrap_or(false);
-    let (parent, notify_parent_on_completion) =
-        super::spawn_parent_policy::local_parent_policy(&params, from_agent)?;
-
-    info!(agent = %name, parent = ?parent, "handle_spawn_agent local start");
-    spawn_via_manager(
-        hub.clone(),
-        name,
-        cwd,
-        model,
-        prompt,
-        parent,
-        permission_mode,
-        decision_mode,
-        agent_type,
-        depth,
-        fork_context,
-        no_sandbox,
-        notify_parent_on_completion,
-    )
-    .await
-}
-
-/// Cross-hub spawn target: MetaHub forwards `meta/spawn` here as
-/// `hub/spawn_remote_agent`. Caller has no shared filesystem, so
-/// `cwd` / `fork_context` / `resume` are forbidden — receiver uses its
-/// own `Hub.default_cwd`.
 pub async fn handle_spawn_remote_agent(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
-    from_agent: &str,
+    principal: &TrustedMetaHubPrincipal,
 ) -> Result<Value, String> {
-    let default_cwd = hub.lock().await.default_cwd.clone();
-    let args = super::spawn_prepare::prepare_remote_spawn_args(&params, from_agent, &default_cwd)?;
-    info!(agent = %args.name, parent = ?args.parent, "handle_spawn_remote_agent start");
-    spawn_via_manager(
-        hub.clone(),
-        args.name,
-        args.cwd,
-        args.model,
-        args.prompt,
-        args.parent,
-        args.permission_mode,
-        args.decision_mode,
-        args.agent_type,
-        args.depth,
-        None,
-        args.no_sandbox,
-        true,
-    )
-    .await
+    let prepared = {
+        let locked = hub.lock().await;
+        super::spawn_prepare::prepare_remote_spawn(&params, &locked, principal.connection())?
+    };
+    spawn_via_manager(hub.clone(), prepared).await
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) async fn spawn_via_manager(
-    hub: Arc<Mutex<Hub>>,
-    name: String,
-    cwd: String,
-    model: Option<String>,
-    prompt: Option<String>,
-    parent: Option<String>,
-    permission_mode: Option<String>,
-    decision_mode: Option<String>,
-    agent_type: Option<String>,
-    depth: Option<u32>,
-    fork_context: Option<Value>,
-    no_sandbox: bool,
-    notify_parent_on_completion: bool,
-) -> Result<Value, String> {
-    let name_clone = name.clone();
-    let handle = tokio::spawn(async move {
-        crate::spawn_manager::spawn_and_register(
-            hub,
-            name_clone,
-            cwd,
-            model,
-            prompt,
-            parent,
-            permission_mode,
-            decision_mode,
-            agent_type,
-            depth,
-            fork_context,
-            no_sandbox,
-            notify_parent_on_completion,
-        )
+async fn spawn_via_manager(hub: Arc<Mutex<Hub>>, prepared: PreparedSpawn) -> Result<Value, String> {
+    let name = prepared.name.clone();
+    info!(agent = %name, parent = ?prepared.parent, "spawn start");
+    let agent_id = tokio::spawn(crate::spawn_manager::spawn_and_register(hub, prepared))
         .await
-    });
-    let agent_id = handle
-        .await
-        .map_err(|e| format!("spawn task failed: {e}"))?
-        .map_err(|e| format!("spawn failed: {e}"))?;
+        .map_err(|error| format!("spawn task failed: {error}"))?
+        .map_err(|error| format!("spawn failed: {error}"))?;
     info!(agent = %name, %agent_id, "spawn done");
     Ok(json!({"agent_id": agent_id, "name": name}))
 }

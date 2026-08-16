@@ -3,7 +3,7 @@ use serde_json::json;
 use crate::support::CliHarness;
 
 /// The vault safety contract through a full turn: the model emits a Bash call
-/// whose `command` holds a `<secret_ref:NAME>` placeholder; the tool pipeline
+/// whose `env` holds a `<secret_ref:NAME>` placeholder; the tool pipeline
 /// resolves plaintext via `hub/secret/get` IPC (harness vault), the shell runs
 /// with the real value, and the result is redacted back to the wire form
 /// before it reaches events, persistence, or the next LLM request.
@@ -20,10 +20,13 @@ async fn secret_resolves_in_tool_and_redacts_before_the_wire() {
             {"expect": {"userContains": "use the secret"},
              "chunks": [
                 {"type": "tool_use", "id": "s1", "name": "Bash",
-                 "input": {"command":
-                    "echo 'tag-<secret_ref:e2e_token>-tag'; \
-                     test \"$(printf %s '<secret_ref:e2e_token>' | wc -c)\" -eq 12 \
-                     && echo len-ok || echo len-bad"}},
+                 "input": {
+                    "command":
+                        "echo \"tag-$TOKEN-tag\"; \
+                         test \"$(printf %s \"$TOKEN\" | wc -c)\" -eq 12 \
+                         && echo len-ok || echo len-bad",
+                    "env": {"TOKEN": "<secret_ref:e2e_token>"}
+                 }},
                 {"type": "done"}
              ]},
             {"expect": {"toolResultId": "s1"},

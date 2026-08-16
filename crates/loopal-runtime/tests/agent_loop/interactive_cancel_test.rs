@@ -86,6 +86,40 @@ async fn cancel_and_assert(
 }
 
 #[tokio::test]
+async fn pre_cancelled_batch_finalizes_interrupted_results_once() {
+    let (mut runner, mut events, _, _, _) = make_runner_with_channels();
+    let (cancel, handle) = cancellation();
+    handle.signal.signal();
+    handle
+        .tx
+        .send_modify(|generation| *generation = generation.wrapping_add(1));
+    let mut turn_ctx = TurnContext::new(0, cancel);
+
+    let stats = in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        vec![("cancelled-1".into(), "Read".into(), serde_json::json!({}))],
+        StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
+
+    assert_eq!((stats.approved, stats.denied, stats.errors), (0, 0, 0));
+    let results = std::iter::from_fn(|| events.try_recv().ok())
+        .filter(|event| matches!(event.payload, AgentEventPayload::ToolResult { .. }))
+        .collect::<Vec<_>>();
+    assert_eq!(results.len(), 1);
+    assert!(matches!(
+        &runner.turns.view().messages()[0].content[0],
+        loopal_provider_api::ContentBlock::ToolResult {
+            content,
+            is_error: true,
+            metadata: Some(ToolResultMetadata::Cancelled { cause: CancelCause::UserInterrupt }),
+            ..
+        } if content == "Interrupted by user"
+    ));
+}
+
+#[tokio::test]
 async fn ask_user_wait_is_cancelled_by_turn_interrupt() {
     let (runner, mut event_rx, question_tx) = make_runner_with_question_channel();
     let (cancel, handle) = cancellation();

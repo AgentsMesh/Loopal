@@ -21,6 +21,7 @@ export interface PermissionItem {
   readonly title: string
   readonly description: string
   readonly risk: 'low' | 'medium' | 'high'
+  readonly canAllow: boolean
   readonly command?: string
 }
 

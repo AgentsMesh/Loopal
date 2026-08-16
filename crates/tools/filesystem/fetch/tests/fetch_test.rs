@@ -1,6 +1,14 @@
 use loopal_tool_api::{PermissionLevel, Tool, ToolContext, TypedBridge};
 use loopal_tool_fetch::{FetchParams, FetchTool};
 
+#[path = "fetch_behavior_test.rs"]
+mod fetch_behavior_test;
+#[path = "fetch_failure_backend.rs"]
+mod fetch_failure_backend;
+#[path = "fetch_failure_test.rs"]
+mod fetch_failure_test;
+#[path = "fetch_refiner_contract_test.rs"]
+mod fetch_refiner_contract_test;
 #[path = "fetch_refiner_test.rs"]
 mod fetch_refiner_test;
 
@@ -33,7 +41,7 @@ fn test_fetch_description() {
 
 #[test]
 fn test_fetch_permission() {
-    assert_eq!(make_tool().permission(), PermissionLevel::ReadOnly);
+    assert_eq!(make_tool().permission(), PermissionLevel::Write);
 }
 
 #[test]

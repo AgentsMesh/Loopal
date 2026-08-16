@@ -88,13 +88,21 @@ fn test_event_tool_permission_request_serde_roundtrip() {
         id: "tc_3".into(),
         name: "Write".into(),
         input: serde_json::json!({"file_path": "/tmp/out.txt"}),
+        permission_intent: None,
     });
     let json = serde_json::to_string(&event).unwrap();
     let deserialized: AgentEvent = serde_json::from_str(&json).unwrap();
-    if let AgentEventPayload::ToolPermissionRequest { id, name, input } = deserialized.payload {
+    if let AgentEventPayload::ToolPermissionRequest {
+        id,
+        name,
+        input,
+        permission_intent,
+    } = deserialized.payload
+    {
         assert_eq!(id, "tc_3");
         assert_eq!(name, "Write");
         assert_eq!(input["file_path"], "/tmp/out.txt");
+        assert!(permission_intent.is_none());
     } else {
         panic!("expected AgentEventPayload::ToolPermissionRequest");
     }

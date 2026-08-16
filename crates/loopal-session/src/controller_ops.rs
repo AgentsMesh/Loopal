@@ -74,6 +74,7 @@ impl ControlBackend {
         &self,
         agent_name: &str,
         interaction_id: &str,
+        intent_digest: Option<loopal_protocol::PermissionIntentDigest>,
         allow: bool,
     ) {
         match self {
@@ -84,7 +85,7 @@ impl ControlBackend {
             }
             Self::Hub(client) => {
                 client
-                    .respond_permission(agent_name, interaction_id, allow)
+                    .respond_permission(agent_name, interaction_id, intent_digest, allow)
                     .await;
             }
         }
@@ -150,3 +151,6 @@ impl ControlBackend {
         }
     }
 }
+
+#[cfg(test)]
+mod branch_tests;

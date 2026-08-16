@@ -7,16 +7,19 @@
 use serde_json::{Value, json};
 
 use loopal_ipc::protocol::methods::VIEW_SNAPSHOT;
+use loopal_protocol::{ROOT_AGENT_NAME, WorkflowRunsSnapshot};
+
+#[cfg(not(test))]
+const SNAPSHOT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+#[cfg(test)]
+const SNAPSHOT_DEADLINE: std::time::Duration = std::time::Duration::from_millis(200);
 
 use super::AcpAdapter;
-use crate::translate::ext::ext_notification;
+use crate::translate::ext::{ext_notification, workflow_run_changed};
 
 impl AcpAdapter {
     pub(crate) async fn replay_loopal_snapshot(&self, session_id: &str) {
-        let Some(agent) = self.first_agent_name().await else {
-            return;
-        };
-        let Some(state) = self.fetch_view_state(&agent).await else {
+        let Some(state) = self.fetch_root_view_state().await else {
             return;
         };
         for (method, params) in build_replay_events(session_id, &state) {
@@ -24,22 +27,14 @@ impl AcpAdapter {
         }
     }
 
-    async fn first_agent_name(&self) -> Option<String> {
-        let resp = self.client.list_agents().await.ok()?;
-        resp.get("agents")?
-            .as_array()?
-            .first()?
-            .get("name")?
-            .as_str()
-            .map(String::from)
-    }
-
-    async fn fetch_view_state(&self, agent: &str) -> Option<Value> {
-        let resp = self
+    async fn fetch_root_view_state(&self) -> Option<Value> {
+        let request = self
             .client
             .connection()
-            .send_request(VIEW_SNAPSHOT.name, json!({ "agent": agent }))
+            .send_request(VIEW_SNAPSHOT.name, json!({ "agent": ROOT_AGENT_NAME }));
+        let resp = tokio::time::timeout(SNAPSHOT_DEADLINE, request)
             .await
+            .ok()?
             .ok()?;
         resp.get("state").cloned()
     }
@@ -99,8 +94,19 @@ fn build_replay_events(session_id: &str, state: &Value) -> Vec<(String, Value)> 
             json!({ "servers": state["mcp_status"] }),
         ));
     }
+    push_workflows(session_id, state, &mut events);
     push_config_observables(session_id, state, &mut events);
     events
+}
+
+fn push_workflows(session_id: &str, state: &Value, events: &mut Vec<(String, Value)>) {
+    let Ok(workflows) = serde_json::from_value::<WorkflowRunsSnapshot>(state["workflows"].clone())
+    else {
+        return;
+    };
+    for workflow in workflows.active.iter().chain(&workflows.recent) {
+        events.push(workflow_run_changed(session_id, workflow));
+    }
 }
 
 /// Replay the agent's config observables (permission_mode / model / mode /
@@ -128,74 +134,5 @@ fn push_config_observables(session_id: &str, state: &Value, events: &mut Vec<(St
 }
 
 #[cfg(test)]
-mod tests {
-    use super::build_replay_events;
-    use serde_json::json;
-
-    fn methods(events: &[(String, serde_json::Value)]) -> Vec<&str> {
-        events.iter().map(|(m, _)| m.as_str()).collect()
-    }
-
-    #[test]
-    fn replays_bg_crons_tasks_mcp() {
-        let state = json!({
-            "bg_tasks": {
-                "bg1": {"id":"bg1","description":"npm","status":"Completed","exit_code":0,"output":"done","created_at_unix_ms":1}
-            },
-            "crons": [{"id":"c1"}],
-            "tasks": [{"id":"t1"}],
-            "mcp_status": [{"name":"fs"}]
-        });
-        let ev = build_replay_events("s", &state);
-        let m = methods(&ev);
-        assert!(m.contains(&"_loopal/bgTask.spawned"));
-        assert!(m.contains(&"_loopal/bgTask.completed")); // status != Running
-        assert!(m.contains(&"_loopal/crons"));
-        assert!(m.contains(&"_loopal/tasks"));
-        assert!(m.contains(&"_loopal/mcp"));
-    }
-
-    #[test]
-    fn running_bg_task_has_no_completed_event() {
-        let state = json!({
-            "bg_tasks": {"bg1": {"id":"bg1","description":"x","status":"Running","output":"","created_at_unix_ms":1}},
-            "crons": [], "tasks": []
-        });
-        let ev = build_replay_events("s", &state);
-        let m = methods(&ev);
-        assert!(m.contains(&"_loopal/bgTask.spawned"));
-        assert!(!m.contains(&"_loopal/bgTask.completed"));
-        assert!(!m.contains(&"_loopal/bgTask.output")); // empty output
-    }
-
-    #[test]
-    fn omits_mcp_when_absent() {
-        let state = json!({"bg_tasks": {}, "crons": [], "tasks": []});
-        let ev = build_replay_events("s", &state);
-        let m = methods(&ev);
-        assert!(!m.contains(&"_loopal/mcp"));
-        assert!(m.contains(&"_loopal/crons"));
-    }
-
-    #[test]
-    fn replays_config_observables_skipping_empty() {
-        let state = json!({
-            "agent": {"observable": {
-                "permission_mode": "bypass", "model": "opus", "mode": "", "thinking_config": "auto"
-            }},
-            "bg_tasks": {}, "crons": [], "tasks": []
-        });
-        let ev = build_replay_events("s", &state);
-        let m = methods(&ev);
-        assert!(m.contains(&"_loopal/permission_mode"));
-        assert!(m.contains(&"_loopal/model"));
-        assert!(!m.contains(&"_loopal/mode")); // empty → skipped
-        assert!(m.contains(&"_loopal/thinking"));
-        let by = |k: &str| ev.iter().find(|(meth, _)| meth == k).unwrap().1.clone();
-        assert_eq!(
-            by("_loopal/permission_mode")["data"]["permission_mode"],
-            "bypass"
-        );
-        assert_eq!(by("_loopal/thinking")["data"]["thinking"], "auto"); // thinking_config → thinking
-    }
-}
+#[path = "snapshot_tests.rs"]
+mod tests;

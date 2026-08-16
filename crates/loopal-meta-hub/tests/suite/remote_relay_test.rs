@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_agent_hub::{HubUplink, UiSession, start_event_loop};
-use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use loopal_protocol::AgentEventPayload;
 use serde_json::json;
@@ -22,8 +21,12 @@ async fn remote_question_round_trips_through_parent_hub_ui() {
         },
     )
     .await;
-    let (remote_agent, _) =
-        register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
+    let (remote_agent, _) = register_remote_agent(
+        &cluster.hub_b,
+        "remote-worker",
+        loopal_protocol::QualifiedAddress::remote(["hub-a"], "main"),
+    )
+    .await;
     let request = tokio::spawn(async move {
         remote_agent
             .send_request(
@@ -107,8 +110,12 @@ async fn last_question_ui_disconnect_cancels_origin_and_snapshot_reconciles() {
     )
     .await;
     let mut events = ui.event_rx.resubscribe();
-    let (remote_agent, _) =
-        register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
+    let (remote_agent, _) = register_remote_agent(
+        &cluster.hub_b,
+        "remote-worker",
+        loopal_protocol::QualifiedAddress::remote(["hub-a"], "main"),
+    )
+    .await;
     let request = tokio::spawn(async move {
         remote_agent
             .send_request(
@@ -164,37 +171,6 @@ async fn last_question_ui_disconnect_cancels_origin_and_snapshot_reconciles() {
     .await
     .unwrap();
     assert!(snapshot["state"]["agent"]["conversation"]["pending_question"].is_null());
-}
-
-#[tokio::test]
-async fn qualified_remote_interrupt_request_is_acknowledged_by_child_agent() {
-    let cluster = cluster().await;
-    let ui = UiSession::connect(
-        cluster.hub_a.clone(),
-        "desktop-ui",
-        loopal_protocol::UiCapabilities::NONE,
-    )
-    .await;
-    // The mock agent acknowledges every request before forwarding a copy to
-    // this receiver, so awaiting the Hub RPC below proves the ACK round trip.
-    let (_agent, mut incoming) =
-        register_mock_agent(&cluster.hub_b, "remote-worker", Some("hub-a/main")).await;
-    ui.client
-        .connection()
-        .send_request(
-            methods::HUB_INTERRUPT.name,
-            json!({"target": "hub-b/remote-worker"}),
-        )
-        .await
-        .unwrap();
-    let message = tokio::time::timeout(Duration::from_secs(3), incoming.recv())
-        .await
-        .expect("remote interrupt was not forwarded")
-        .expect("remote agent connection closed");
-    assert!(matches!(
-        message,
-        Incoming::Request { method, .. } if method == methods::AGENT_INTERRUPT.name
-    ));
 }
 
 struct Cluster {

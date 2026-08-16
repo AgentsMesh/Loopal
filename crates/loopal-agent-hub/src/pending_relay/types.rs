@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use loopal_ipc::connection::{Connection, Listening};
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, PermissionIntent};
 
 use crate::HubUplink;
 use crate::authoritative_events::PreparedAuthoritativeEvent;
@@ -22,6 +22,7 @@ impl InteractionAudience {
 }
 
 pub struct PendingPermissionInfo {
+    pub(crate) execution: crate::types::AgentExecutionRef,
     pub agent_conn: Arc<Connection<Listening>>,
     pub agent_ipc_id: i64,
     pub agent_name: String,
@@ -30,6 +31,7 @@ pub struct PendingPermissionInfo {
     /// Agent-owned id. Never accepted as authority from a UI response.
     pub logical_id: String,
     pub tool_name: String,
+    pub permission_intent: PermissionIntent,
 }
 
 pub struct PendingQuestionInfo {
@@ -76,6 +78,19 @@ pub(crate) struct OriginRemoteQuestionCancel {
 
 pub(super) enum FastPath {
     DenyNoUi,
+    RejectDuplicate,
+    Pending(Box<PreparedAuthoritativeEvent>),
+}
+
+pub(super) enum PermissionFastPath {
+    Authorize {
+        audit: loopal_protocol::PermissionDecisionAuditRequest,
+        intent: Box<loopal_protocol::PermissionIntent>,
+        source: loopal_protocol::PermissionAuditSource,
+    },
+    DenyInvalid,
+    DenyNoUi,
+    DenyStale,
     RejectDuplicate,
     Pending(Box<PreparedAuthoritativeEvent>),
 }

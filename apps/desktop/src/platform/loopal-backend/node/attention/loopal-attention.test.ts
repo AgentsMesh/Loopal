@@ -4,18 +4,27 @@ const now = () => new Date('2026-07-11T12:00:00.000Z')
 const scope = {
   workspaceId: 'workspace', sessionId: 'session', runtimeId: 'runtime', generation: 3,
 }
+const intentDigest = `sha256:${'ab'.repeat(32)}`
 
 describe('Loopal attention projection', () => {
   it('projects permission requests with risk and readable input', () => {
     const permission = projectAttentionEvent('permission_requested', {
       id: 'p1', name: 'Bash', input: { command: 'rm file' },
+      permission_intent: { intent_digest: intentDigest },
     }, scope, 'worker', now)
     expect(permission).toMatchObject({
       type: 'permission_requested',
-      request: { id: 'p1', agentId: 'worker', tool: 'Bash', risk: 'high' },
+      request: {
+        id: 'p1', agentId: 'worker', tool: 'Bash', risk: 'high', intentDigest,
+      },
     })
     expect(permission?.type === 'permission_requested' && permission.request.detail)
       .toContain('"command": "rm file"')
+    const legacy = projectAttentionEvent('permission_requested', {
+      id: 'legacy', name: 'Write', input: {},
+    }, scope, 'worker', now)
+    expect(legacy?.type === 'permission_requested' && legacy.request)
+      .not.toHaveProperty('intentDigest')
     expect(projectAttentionEvent('permission_requested', {
       id: 'p2', name: 'Read', input: 'README.md',
     }, scope, 'worker', now)).toMatchObject({ request: { risk: 'low', detail: 'README.md' } })

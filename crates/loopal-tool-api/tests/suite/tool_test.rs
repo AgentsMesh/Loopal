@@ -1,5 +1,47 @@
-use loopal_tool_api::{ImageResult, ToolResult};
-use loopal_tool_invocation::ToolImageBlock;
+use async_trait::async_trait;
+use loopal_error::LoopalError;
+use loopal_tool_api::{
+    ImageOutputPolicy, ImageResult, PermissionLevel, Tool, ToolContext, ToolDispatch, ToolResult,
+};
+use loopal_tool_invocation::{ToolImageBlock, ToolResultMetadata};
+use serde_json::Value;
+
+struct DefaultPolicyTool;
+
+#[async_trait]
+impl Tool for DefaultPolicyTool {
+    fn name(&self) -> &str {
+        "DefaultPolicy"
+    }
+
+    fn description(&self) -> &str {
+        "test defaults"
+    }
+
+    fn parameters_schema(&self) -> Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    fn permission(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
+
+    fn secret_eligible_params(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    async fn execute(&self, _input: Value, _ctx: &ToolContext) -> Result<ToolResult, LoopalError> {
+        Ok(ToolResult::success("ok"))
+    }
+}
+
+#[test]
+fn tool_defaults_deny_images_and_use_pipeline() {
+    let tool = DefaultPolicyTool;
+    assert_eq!(tool.dispatch(), ToolDispatch::Pipeline);
+    assert_eq!(tool.image_output_policy(), ImageOutputPolicy::Deny);
+    assert_eq!(tool.precheck(&serde_json::json!({})), None);
+}
 
 #[test]
 fn test_tool_result_success() {
@@ -44,13 +86,16 @@ fn test_with_image_appends_inline_block() {
 }
 
 #[test]
-fn test_with_images_extends() {
+fn test_with_images_extends_and_metadata_is_preserved() {
     let imgs = vec![
         ToolImageBlock::inline("image/png", "a"),
         ToolImageBlock::session_resource("hash1", "image/jpeg", 100),
     ];
-    let r = ToolResult::success("").with_images(imgs);
+    let r = ToolResult::success("")
+        .with_images(imgs)
+        .with_metadata(ToolResultMetadata::bytes_written(7));
     assert_eq!(r.images.len(), 2);
+    assert_eq!(r.metadata, Some(ToolResultMetadata::bytes_written(7)));
 }
 
 #[test]

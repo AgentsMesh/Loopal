@@ -6,14 +6,14 @@ use tracing::{info, warn};
 use crate::agent_input::AgentInput;
 use crate::frontend::traits::{AgentFrontend, EventEmitter, PlanApproval};
 use loopal_error::Result;
-use loopal_protocol::ControlCommand;
-use loopal_protocol::Envelope;
-use loopal_protocol::QualifiedAddress;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, ControlCommand, Envelope, PermissionIntentRequest,
+    QualifiedAddress,
+};
 use loopal_tool_api::PermissionDecision;
 
 use super::emitter::ChannelEventEmitter;
-use super::permission_handler::PermissionHandler;
+use super::permission_handler::{PermissionHandler, PermissionOutcome};
 use super::question_handler::QuestionHandler;
 
 pub struct UnifiedFrontend {
@@ -121,9 +121,8 @@ impl AgentFrontend for UnifiedFrontend {
         let mut mbox = self.mailbox_rx.lock().await;
         let mut ctrl = self.control_rx.lock().await;
 
-        // The control plane wins a same-boundary race. In particular, a queued
-        // Suspend must close the continuation gate before automatic goal work
-        // can start another provider request.
+        // Control wins same-boundary races so Suspend closes the continuation
+        // gate before automatic goal work can start another provider request.
         let control_disconnected = match ctrl.try_recv() {
             Ok(command) => return Ok(AgentInput::Control(command)),
             Err(mpsc::error::TryRecvError::Empty) => false,
@@ -139,18 +138,22 @@ impl AgentFrontend for UnifiedFrontend {
         }
     }
 
-    async fn request_permission(
+    async fn request_permission(&self, request: &PermissionIntentRequest) -> PermissionDecision {
+        self.request_permission_outcome(request).await.decision
+    }
+
+    async fn request_permission_outcome(
         &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionDecision {
-        let outcome = self.permission_handler.decide(id, name, input).await;
-        let (decision, payload) = super::dispatch::into_permission_decided(name, outcome);
+        request: &PermissionIntentRequest,
+    ) -> PermissionOutcome {
+        let outcome = self.permission_handler.decide(request).await;
+        let (decision, payload) =
+            super::dispatch::into_permission_decided(&request.tool_name, outcome.clone());
         if let Err(e) = self.emit(payload).await {
             tracing::error!(ctx = "unified::permission_decided", error = %e, "event emit failed");
         }
-        decision
+        let _ = decision;
+        outcome
     }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter> {

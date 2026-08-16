@@ -1,6 +1,7 @@
-use loopal_protocol::ControlCommand;
-use loopal_protocol::Envelope;
-use tokio::sync::mpsc;
+use loopal_protocol::{
+    ControlCommand, Envelope, WorkflowTerminalDisposition, WorkflowTerminalNotification,
+};
+use tokio::sync::{mpsc, watch};
 
 /// Input to the agent loop — either a data message or a control command.
 ///
@@ -20,6 +21,37 @@ pub enum AgentInput {
     Control(ControlCommand),
     /// A control command carrying an application acknowledgement lease.
     TrackedControl(ControlRequest),
+    /// A terminal workflow result whose acknowledgement follows durable turn persistence.
+    WorkflowTerminal(WorkflowTerminalRequest),
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowTerminalRequest {
+    notification: WorkflowTerminalNotification,
+    acknowledgement: watch::Sender<Option<WorkflowTerminalDisposition>>,
+}
+
+impl WorkflowTerminalRequest {
+    pub fn tracked(
+        notification: WorkflowTerminalNotification,
+    ) -> (Self, watch::Receiver<Option<WorkflowTerminalDisposition>>) {
+        let (acknowledgement, receiver) = watch::channel(None);
+        (
+            Self {
+                notification,
+                acknowledgement,
+            },
+            receiver,
+        )
+    }
+
+    pub fn notification(&self) -> &WorkflowTerminalNotification {
+        &self.notification
+    }
+
+    pub async fn acknowledge(&self, disposition: WorkflowTerminalDisposition) {
+        self.acknowledgement.send_replace(Some(disposition));
+    }
 }
 
 #[derive(Debug, Clone)]

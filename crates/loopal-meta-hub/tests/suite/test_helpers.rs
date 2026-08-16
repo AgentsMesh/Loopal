@@ -4,17 +4,18 @@ use std::sync::Arc;
 
 use tokio::sync::{Mutex, mpsc};
 
-use loopal_agent_hub::Hub;
-use loopal_agent_hub::spawn_manager::register_agent_connection;
+use loopal_agent_hub::{AgentLifecycle, Hub};
 use loopal_ipc::connection::{Connection, Incoming, Listening};
-use loopal_protocol::AgentEvent;
+use loopal_protocol::{AgentEvent, AgentEventPayload, QualifiedAddress, SubAgentSpawn};
 use serde_json::json;
 
 use loopal_meta_hub::MetaHub;
 
 pub fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel::<AgentEvent>(64);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    let mut hub = Hub::new(tx);
+    hub.set_protected_audit(Arc::new(loopal_vault_api::NoopAuditSink));
+    (Arc::new(Mutex::new(hub)), rx)
 }
 
 /// Wire a Sub-Hub to MetaHub via in-process duplex (bidirectional).
@@ -64,27 +65,106 @@ pub async fn wire_hub_to_meta(
     hub_conn
 }
 
-/// Register a mock agent with auto-responder. Returns (conn, forwarded_rx).
 pub async fn register_mock_agent(
     hub: &Arc<Mutex<Hub>>,
     name: &str,
     parent: Option<&str>,
 ) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
+    assert!(
+        parent.is_none(),
+        "remote agents require typed fixture setup"
+    );
+    let (client_conn, client_rx) = loopal_agent_hub::hub_server::connect_local(hub.clone(), name);
+    wait_for_agent(hub, name).await;
+    auto_respond(client_conn, client_rx)
+}
+
+pub async fn send_agent_request(
+    hub: &Arc<Mutex<Hub>>,
+    name: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, loopal_ipc::RpcError> {
+    let (connection, _incoming) = loopal_agent_hub::hub_server::connect_local(hub.clone(), name);
+    wait_for_agent(hub, name).await;
+    connection.send_request(method, params).await
+}
+
+pub async fn register_remote_agent(
+    hub: &Arc<Mutex<Hub>>,
+    name: &str,
+    parent: QualifiedAddress,
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
+    assert!(
+        parent.is_remote(),
+        "remote fixture requires a qualified parent"
+    );
     let (client_transport, server_transport) = loopal_ipc::duplex_pair();
     let (server_conn, server_rx) = Connection::new(server_transport).into_listening();
     let (client_conn, client_rx) = Connection::new(client_transport).into_listening();
 
-    let _ = register_agent_connection(
+    let event_tx = {
+        let mut locked = hub.lock().await;
+        locked
+            .registry
+            .register_connection_with_parent(
+                name,
+                server_conn.clone(),
+                Some(parent.clone()),
+                None,
+                None,
+            )
+            .expect("remote agent registration must succeed");
+        locked.registry.set_lifecycle(name, AgentLifecycle::Running);
+        locked.registry.event_sender()
+    };
+    event_tx
+        .send(AgentEvent::named(
+            parent.clone(),
+            AgentEventPayload::SubAgentSpawned(SubAgentSpawn {
+                name: name.to_string(),
+                agent_id: format!("fixture-{name}"),
+                parent: Some(parent),
+                model: None,
+                session_id: None,
+            }),
+        ))
+        .await
+        .expect("remote spawn event receiver must remain active");
+    let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
         hub.clone(),
+    ));
+    loopal_agent_hub::agent_io::spawn_io_loop(
+        hub.clone(),
+        dispatcher,
         name,
         server_conn,
         server_rx,
-        parent,
-        None,
-        None,
-    )
-    .await;
+    );
 
+    (client_conn, client_rx)
+}
+
+async fn wait_for_agent(hub: &Arc<Mutex<Hub>>, name: &str) {
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while hub
+            .lock()
+            .await
+            .registry
+            .get_agent_connection(name)
+            .is_none()
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("managed Agent IO must register its connection");
+}
+
+fn auto_respond(
+    client_conn: Arc<Connection<Listening>>,
+    client_rx: mpsc::Receiver<Incoming>,
+) -> (Arc<Connection<Listening>>, mpsc::Receiver<Incoming>) {
     let cc = client_conn.clone();
     let mut listen_rx = client_rx;
     let (forward_tx, forward_rx) = mpsc::channel::<Incoming>(64);

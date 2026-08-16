@@ -7,11 +7,10 @@ use globset::Glob;
 use ignore::WalkState;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{GlobEntry, GlobOptions, GlobSearchResult};
-use loopal_tool_api::save_to_overflow_file;
 use parking_lot::Mutex;
 
 use crate::limits::ResourceLimits;
-use crate::search::{overflow_fmt, walker};
+use crate::search::walker;
 
 pub fn glob_search(
     opts: &GlobOptions,
@@ -33,7 +32,6 @@ pub fn glob_search(
             entries: Vec::new(),
             truncated: false,
             timed_out: false,
-            overflow_path: None,
         });
     };
 
@@ -95,19 +93,10 @@ pub fn glob_search(
 
     let entries = Arc::try_unwrap(entries).unwrap().into_inner();
     let truncated = entries.len() >= max;
-    let overflow_path = if truncated {
-        Some(save_to_overflow_file(
-            &overflow_fmt::serialize_glob_results(&entries),
-            "glob_results",
-        ))
-    } else {
-        None
-    };
 
     Ok(GlobSearchResult {
         entries,
         truncated,
         timed_out: timed_out.load(Ordering::Relaxed),
-        overflow_path,
     })
 }

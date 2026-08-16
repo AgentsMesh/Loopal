@@ -4,11 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_error::McpError;
-use rmcp::transport::WorkerTransport;
-use rmcp::transport::auth::{AuthClient, AuthorizationManager, CredentialStore, OAuthState};
-use rmcp::transport::streamable_http_client::{
-    StreamableHttpClientTransportConfig, StreamableHttpClientWorker,
-};
+use rmcp::transport::auth::{AuthorizationManager, CredentialStore, OAuthState};
 use tracing::{info, warn};
 
 use super::callback;
@@ -116,11 +112,5 @@ async fn connect_authed(
         .connect_timeout(Duration::from_secs(30))
         .build()
         .map_err(|_| connection_failed("OAuth HTTP client initialization failed"))?;
-    let auth_client = AuthClient::new(http_client, auth_manager);
-    let config = StreamableHttpClientTransportConfig::with_uri(url);
-    let worker = StreamableHttpClientWorker::new(auth_client, config);
-    let transport = WorkerTransport::spawn(worker);
-    McpClient::connect(transport, timeout, sampling)
-        .await
-        .map_err(|_| connection_failed("OAuth MCP connection failed"))
+    crate::oauth_transport::connect(url, http_client, auth_manager, timeout, sampling).await
 }

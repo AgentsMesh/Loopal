@@ -3,9 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use loopal_error::Result;
-use loopal_protocol::{AgentEventPayload, Question, UserQuestionResponse};
+use loopal_protocol::{AgentEventPayload, PermissionIntentRequest, Question, UserQuestionResponse};
 use loopal_runtime::agent_input::AgentInput;
-use loopal_runtime::frontend::permission_handler::PermissionHandler;
+use loopal_runtime::frontend::permission_handler::{PermissionHandler, PermissionOutcome};
 use loopal_runtime::frontend::question_handler::QuestionHandler;
 use loopal_runtime::frontend::traits::{AgentFrontend, EventEmitter};
 use loopal_tool_api::PermissionDecision;
@@ -114,16 +114,20 @@ impl AgentFrontend for HubFrontend {
         self.input.try_next().await
     }
 
-    async fn request_permission(
+    async fn request_permission(&self, request: &PermissionIntentRequest) -> PermissionDecision {
+        self.request_permission_outcome(request).await.decision
+    }
+
+    async fn request_permission_outcome(
         &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionDecision {
-        let outcome = self.permission_handler.decide(id, name, input).await;
-        let (decision, payload) = loopal_runtime::frontend::into_permission_decided(name, outcome);
+        request: &PermissionIntentRequest,
+    ) -> PermissionOutcome {
+        let outcome = self.permission_handler.decide(request).await;
+        let (decision, payload) =
+            loopal_runtime::frontend::into_permission_decided(&request.tool_name, outcome.clone());
         let _ = self.broadcaster.broadcast(payload).await;
-        decision
+        let _ = decision;
+        outcome
     }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter> {

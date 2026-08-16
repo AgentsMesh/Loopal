@@ -29,28 +29,28 @@ impl HubMcpService {
         self.hub_singleton.read().await.get(&canonical).cloned()
     }
 
-    /// Collect every (server, ToolDefinition) visible to `agent_name`,
+    /// Collect every (server, ToolDefinition) visible to `execution`,
     /// applying the same priority used by `provider_for_call`:
     /// per-agent > spawn-tree > hub-singleton. Tools whose `(server)` is
     /// already produced by a higher-priority provider are skipped so the
     /// listing matches what an actual call would dispatch to.
-    pub async fn list_tools_for(
+    pub(crate) async fn list_tools_for(
         &self,
-        agent_name: &str,
+        execution: &crate::types::AgentExecutionRef,
         cwd: &std::path::Path,
     ) -> Vec<(String, loopal_tool_api::ToolDefinition)> {
         let mut out: Vec<(String, loopal_tool_api::ToolDefinition)> = Vec::new();
         let mut claimed_servers: std::collections::HashSet<String> =
             std::collections::HashSet::new();
 
-        if let Some(p) = self.per_agent.read().await.get(agent_name) {
+        if let Some(p) = self.per_agent.read().await.get(execution) {
             append_tools(
                 &mut out,
                 &mut claimed_servers,
                 p.list_tools(loopal_mcp::HUB_RPC_BUDGET).await,
             );
         }
-        if let Some(r) = self.root_of(agent_name)
+        if let Some(r) = self.root_of(execution)
             && let Some(p) = self.spawn_tree.read().await.get(&r)
         {
             append_tools(
@@ -70,17 +70,17 @@ impl HubMcpService {
         out
     }
 
-    pub async fn snapshots_for(
+    pub(crate) async fn snapshots_for(
         &self,
-        agent_name: &str,
+        execution: &crate::types::AgentExecutionRef,
         cwd: &std::path::Path,
     ) -> Vec<loopal_mcp::McpConnectionSnapshot> {
         let mut out = Vec::new();
         let mut claimed = std::collections::HashSet::new();
-        if let Some(provider) = self.per_agent.read().await.get(agent_name) {
+        if let Some(provider) = self.per_agent.read().await.get(execution) {
             append_snapshots(&mut out, &mut claimed, provider.as_ref()).await;
         }
-        if let Some(root) = self.root_of(agent_name)
+        if let Some(root) = self.root_of(execution)
             && let Some(provider) = self.spawn_tree.read().await.get(&root)
         {
             append_snapshots(&mut out, &mut claimed, provider.as_ref()).await;
@@ -92,20 +92,20 @@ impl HubMcpService {
         out
     }
 
-    /// Resolve which provider owns `server` for `agent_name`, in priority
+    /// Resolve which provider owns `server` for `execution`, in priority
     /// per-agent → spawn-tree → hub-singleton.
-    pub async fn provider_for_call(
+    pub(crate) async fn provider_for_call(
         &self,
-        agent_name: &str,
+        execution: &crate::types::AgentExecutionRef,
         cwd: &std::path::Path,
         server: &str,
     ) -> Option<Arc<dyn McpProvider>> {
-        if let Some(p) = self.per_agent.read().await.get(agent_name)
+        if let Some(p) = self.per_agent.read().await.get(execution)
             && p.has_server(server).await
         {
             return Some(p.clone() as Arc<dyn McpProvider>);
         }
-        if let Some(r) = self.root_of(agent_name)
+        if let Some(r) = self.root_of(execution)
             && let Some(p) = self.spawn_tree.read().await.get(&r)
             && p.has_server(server).await
         {

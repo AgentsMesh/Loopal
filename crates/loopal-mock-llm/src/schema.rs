@@ -2,6 +2,7 @@ use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Map, Value};
 
 const CALL_FIELDS: &[&str] = &[
+    "label",
     "expect",
     "status",
     "retryAfterMs",

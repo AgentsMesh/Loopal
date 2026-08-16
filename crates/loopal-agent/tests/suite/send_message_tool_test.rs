@@ -53,6 +53,7 @@ fn make_ctx_with_hub_peer(
         scheduler_handle,
         message_snapshot: Arc::new(std::sync::RwLock::new(Vec::new())),
         goal_session: None,
+        workflow_control: None,
     });
     let shared_any: Arc<dyn std::any::Any + Send + Sync> = Arc::new(shared);
     (

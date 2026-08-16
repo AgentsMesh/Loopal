@@ -64,7 +64,7 @@ async fn observer_ui_does_not_enable_interactive_requests() {
     let permission = agent
         .send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "p", "tool_name": "Bash", "tool_input": {}}),
+            crate::permission_request("p", "Bash", json!({})),
         )
         .await
         .unwrap();

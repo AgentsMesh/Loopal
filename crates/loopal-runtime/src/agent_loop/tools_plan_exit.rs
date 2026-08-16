@@ -1,10 +1,10 @@
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
 use loopal_tool_plan_mode::EXIT_PLAN_NAME;
 use tracing::{debug, info, warn};
 
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 use super::turn_context::TurnContext;
 use crate::frontend::traits::{PlanApproval, PlanApprovalCancellationReason};
 use crate::mode::AgentMode;
@@ -15,13 +15,13 @@ impl AgentLoopRunner {
         turn_ctx: &mut TurnContext,
         idx: usize,
         id: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         debug!(tool = EXIT_PLAN_NAME, "intercepted");
 
         if self.params.config.mode != AgentMode::Plan {
             return Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     EXIT_PLAN_NAME,
                     "You are not in plan mode. If your plan was already approved, \
@@ -42,7 +42,7 @@ impl AgentLoopRunner {
                 );
                 return Ok((
                     idx,
-                    self.emit_and_block(id, EXIT_PLAN_NAME, msg, true, None)
+                    self.pending_tool_result(id, EXIT_PLAN_NAME, msg, true, None)
                         .await?,
                 ));
             }
@@ -79,7 +79,7 @@ impl AgentLoopRunner {
             }
             PlanApproval::Reject => Ok((
                 idx,
-                self.emit_and_block(
+                self.pending_tool_result(
                     id,
                     EXIT_PLAN_NAME,
                     "User rejected the plan. Revise and call ExitPlanMode again.",
@@ -98,7 +98,7 @@ impl AgentLoopRunner {
                 };
                 Ok((
                     idx,
-                    self.emit_and_block(
+                    self.pending_tool_result(
                         id,
                         EXIT_PLAN_NAME,
                         plan_cancellation_message(reason),
@@ -146,7 +146,7 @@ impl AgentLoopRunner {
         idx: usize,
         id: &str,
         plan: &str,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         let team_hint = if self.params.deps.kernel.get_tool("Agent").is_some() {
             "\n\nIf this plan can be broken into independent tasks, \
              consider using the Agent tool to parallelize."
@@ -162,7 +162,7 @@ impl AgentLoopRunner {
         );
         Ok((
             idx,
-            self.emit_and_block(id, EXIT_PLAN_NAME, content, false, None)
+            self.pending_tool_result(id, EXIT_PLAN_NAME, content, false, None)
                 .await?,
         ))
     }

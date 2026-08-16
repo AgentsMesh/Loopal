@@ -1,8 +1,3 @@
-//! Shared harness: HubFrontend + real agent loop for full-stack interaction tests.
-//!
-//! Mirrors the production path in `session_start.rs` but uses in-process channels
-//! and mock provider instead of real IPC transport + LLM.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -126,10 +121,11 @@ pub async fn build_hub_harness_with(
     }
     let start = StartParams {
         no_sandbox: true,
+        sandbox_policy: None,
+        session_id: None,
         ..Default::default()
     };
-    let (hub_conn, _hub_peer) = loopal_ipc::duplex_pair();
-    let (hub_connection, _hub_rx) = loopal_ipc::Connection::new(hub_conn).into_listening();
+    let hub_connection = crate::protected_audit_hub::connection();
 
     let hub = loopal_agent_server::testing::SessionHub::default();
     let setup = loopal_agent_server::testing::build_with_frontend(

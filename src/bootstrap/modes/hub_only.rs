@@ -6,6 +6,11 @@ use crate::cli::Cli;
 use super::hub_registration::HubRegistration;
 use super::startup_protocol::StartupProtocol;
 
+#[cfg(not(test))]
+const DESKTOP_CLEANUP_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+#[cfg(test)]
+const DESKTOP_CLEANUP_DELAY: std::time::Duration = std::time::Duration::ZERO;
+
 pub async fn run(
     cli: &Cli,
     cwd: &std::path::Path,
@@ -39,6 +44,17 @@ async fn run_with_protocol(
     resume: Option<&str>,
     startup_protocol: StartupProtocol,
 ) -> anyhow::Result<()> {
+    run_with_protocol_observed(cli, cwd, config, resume, startup_protocol, None).await
+}
+
+async fn run_with_protocol_observed(
+    cli: &Cli,
+    cwd: &std::path::Path,
+    config: &loopal_config::ResolvedConfig,
+    resume: Option<&str>,
+    startup_protocol: StartupProtocol,
+    alive_observer: Option<oneshot::Sender<(String, String)>>,
+) -> anyhow::Result<()> {
     info!(?startup_protocol, "starting Hub-backed host mode");
 
     let (alive_tx, alive_rx) = oneshot::channel();
@@ -59,6 +75,9 @@ async fn run_with_protocol(
     };
     let alive_task = tokio::spawn(async move {
         if let Ok(info) = alive_rx.await {
+            if let Some(observer) = alive_observer {
+                let _ = observer.send((info.addr.clone(), info.token.clone()));
+            }
             startup_protocol.write_alive(info.addr, info.token).await;
         }
     });
@@ -101,16 +120,19 @@ async fn run_with_protocol(
         startup_protocol
             .write_error("root_view_not_ready", error.to_string())
             .await;
+        let _ = ctx.shutdown().await;
         return Err(error);
     }
 
-    let port = match ctx.hub.lock().await.listener_port {
+    let listener_port = { ctx.hub.lock().await.listener_port };
+    let port = match listener_port {
         Some(p) => p,
         None => {
             let msg = "hub listener has no port";
             startup_protocol
                 .write_error("listener_unavailable", msg)
                 .await;
+            let _ = ctx.shutdown().await;
             return Err(anyhow::anyhow!(msg));
         }
     };
@@ -127,7 +149,7 @@ async fn run_with_protocol(
         // Let the Desktop register and take its initial snapshot before the
         // synchronous session-directory scan begins.
         tokio::spawn(async {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(DESKTOP_CLEANUP_DELAY).await;
             super::cleanup_bash_log_orphans().await;
         });
     }
@@ -161,6 +183,12 @@ async fn run_with_protocol(
         info!("hub/shutdown received, draining agent");
     }
     registration.withdraw();
-    let _ = ctx.agent_proc.shutdown().await;
-    Ok(())
+    ctx.shutdown().await
 }
+
+#[cfg(test)]
+#[path = "hub_only_resume_lifecycle_tests.rs"]
+mod resume_tests;
+#[cfg(test)]
+#[path = "hub_only_lifecycle_tests.rs"]
+mod tests;

@@ -97,18 +97,29 @@ async fn plan_mode_allows_read_with_reminder() {
 }
 
 #[tokio::test]
-async fn plan_mode_write_blocks_non_plan_path() {
+async fn plan_mode_write_and_edit_block_non_plan_paths() {
     let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
     setup_plan_state(&mut runner);
     runner.params.config.permission_mode = PermissionMode::Bypass;
 
     tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
 
-    let tool_uses = vec![(
-        "tc-1".to_string(),
-        "Write".to_string(),
-        serde_json::json!({"file_path": "/tmp/not-a-plan.txt", "content": "hack"}),
-    )];
+    let tool_uses = vec![
+        (
+            "tc-write".to_string(),
+            "Write".to_string(),
+            serde_json::json!({"file_path": "/tmp/not-a-plan.txt", "content": "hack"}),
+        ),
+        (
+            "tc-edit".to_string(),
+            "Edit".to_string(),
+            serde_json::json!({
+                "file_path": "/tmp/not-a-plan.txt",
+                "old_string": "before",
+                "new_string": "after"
+            }),
+        ),
+    ];
     let mut turn_ctx = make_turn_ctx();
     in_turn(runner.execute_tools(
         &mut turn_ctx,
@@ -119,13 +130,16 @@ async fn plan_mode_write_blocks_non_plan_path() {
     .unwrap();
 
     let msg = &runner.turns.view().messages()[0];
-    match &msg.content[0] {
-        ContentBlock::ToolResult {
-            content, is_error, ..
-        } => {
-            assert!(is_error);
-            assert!(content.contains("only the plan file"));
+    assert_eq!(msg.content.len(), 2);
+    for block in &msg.content {
+        match block {
+            ContentBlock::ToolResult {
+                content, is_error, ..
+            } => {
+                assert!(is_error);
+                assert!(content.contains("only the plan file"));
+            }
+            other => panic!("expected ToolResult, got {other:?}"),
         }
-        other => panic!("expected ToolResult, got {other:?}"),
     }
 }

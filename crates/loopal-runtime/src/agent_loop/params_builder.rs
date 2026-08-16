@@ -33,7 +33,10 @@ pub struct AgentLoopParamsBuilder {
     message_snapshot: Option<Arc<std::sync::RwLock<Vec<Message>>>>,
     resume_hooks: Vec<Arc<dyn SessionResumeHook>>,
     scheduler: Option<Arc<loopal_scheduler::CronScheduler>>,
+    workflow_permission_causation: Option<loopal_protocol::WorkflowPermissionCausation>,
     decision_cell: crate::frontend::DecisionCell,
+    workflow_input_handler: Option<Arc<dyn crate::workflow_input::WorkflowInputHandler>>,
+    workflow_lease_tracker: Arc<crate::workflow_lease::WorkflowLeaseTracker>,
 }
 
 impl AgentLoopParamsBuilder {
@@ -64,9 +67,12 @@ impl AgentLoopParamsBuilder {
             message_snapshot: None,
             resume_hooks: Vec::new(),
             scheduler: None,
+            workflow_permission_causation: None,
             decision_cell: crate::frontend::DecisionCell::new(
                 loopal_decision_api::DecisionMode::default(),
             ),
+            workflow_input_handler: None,
+            workflow_lease_tracker: Arc::new(crate::workflow_lease::WorkflowLeaseTracker::default()),
         }
     }
 
@@ -74,7 +80,6 @@ impl AgentLoopParamsBuilder {
         self.initial_turns = turns;
         self
     }
-
     pub fn hydrate_initial_history(mut self, hydrate: bool) -> Self {
         self.hydrate_initial_history = hydrate;
         self
@@ -139,8 +144,29 @@ impl AgentLoopParamsBuilder {
         self.scheduler = Some(s);
         self
     }
+    pub fn workflow_permission_causation_opt(
+        mut self,
+        causation: Option<loopal_protocol::WorkflowPermissionCausation>,
+    ) -> Self {
+        self.workflow_permission_causation = causation;
+        self
+    }
     pub fn decision_cell(mut self, c: crate::frontend::DecisionCell) -> Self {
         self.decision_cell = c;
+        self
+    }
+    pub fn workflow_input_handler(
+        mut self,
+        handler: Arc<dyn crate::workflow_input::WorkflowInputHandler>,
+    ) -> Self {
+        self.workflow_input_handler = Some(handler);
+        self
+    }
+    pub fn workflow_lease_tracker(
+        mut self,
+        tracker: Arc<crate::workflow_lease::WorkflowLeaseTracker>,
+    ) -> Self {
+        self.workflow_lease_tracker = tracker;
         self
     }
 
@@ -165,7 +191,10 @@ impl AgentLoopParamsBuilder {
             message_snapshot: self.message_snapshot,
             resume_hooks: self.resume_hooks,
             scheduler: self.scheduler,
+            workflow_permission_causation: self.workflow_permission_causation,
             decision_cell: self.decision_cell,
+            workflow_input_handler: self.workflow_input_handler,
+            workflow_lease_tracker: self.workflow_lease_tracker,
         }
     }
 }

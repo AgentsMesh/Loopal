@@ -17,6 +17,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_view_state::ViewStateApplyOutcome;
 
 use crate::hub::Hub;
 use crate::topology::AgentLifecycle;
@@ -30,15 +31,22 @@ pub fn start_event_loop(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         tracing::info!("hub event loop started");
-        let broadcaster = {
+        let (broadcaster, redaction_seed) = {
             let h = hub.lock().await;
-            h.ui.event_broadcaster()
+            (h.ui.event_broadcaster(), h.final_sink_redaction_seed())
         };
-        while let Some(mut event) = raw_rx.recv().await {
+        while let Some(event) = raw_rx.recv().await {
+            let mut event = redaction_seed.guard_event(event);
             match apply_to_view_state(&hub, &event).await {
                 EventRoute::Broadcast(rev) => event.rev = rev,
                 EventRoute::DropStale => {
                     tracing::debug!(agent = ?event.agent_name, "queued event belongs to a stale generation; dropping");
+                    continue;
+                }
+                EventRoute::ResyncRequired => {
+                    let h = hub.lock().await;
+                    h.ui.request_resync();
+                    tracing::warn!(agent = ?event.agent_name, "view projection revision gap; requesting snapshot resync");
                     continue;
                 }
             }
@@ -53,6 +61,7 @@ pub fn start_event_loop(
 enum EventRoute {
     Broadcast(Option<u64>),
     DropStale,
+    ResyncRequired,
 }
 
 /// Apply the event to the originating agent's `ViewStateReducer` so
@@ -85,14 +94,18 @@ async fn apply_to_view_state(hub: &Arc<tokio::sync::Mutex<Hub>>, event: &AgentEv
         };
         reducer
     };
-    let rev = reducer.lock().await.apply(event.payload.clone());
+    let outcome = reducer.lock().await.apply_checked(event.payload.clone());
     if let Some(generation) = event.routing_generation {
         let h = hub.lock().await;
         if !h.registry.owns_generation(&addr.agent, generation) {
             return EventRoute::DropStale;
         }
     }
-    EventRoute::Broadcast(rev)
+    match outcome {
+        ViewStateApplyOutcome::Applied { revision } => EventRoute::Broadcast(Some(revision)),
+        ViewStateApplyOutcome::NoOp => EventRoute::Broadcast(None),
+        ViewStateApplyOutcome::ResyncRequired(_) => EventRoute::ResyncRequired,
+    }
 }
 
 fn project_lifecycle(hub: &mut Hub, agent: &str, payload: &AgentEventPayload) {

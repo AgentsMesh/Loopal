@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::AuditError;
+
 pub type VaultResult<T> = Result<T, VaultError>;
 
 #[derive(Debug, thiserror::Error)]
@@ -39,6 +41,9 @@ pub enum VaultError {
 
     #[error("editor command failed: {0}")]
     EditorFailed(String),
+
+    #[error("protected audit failed: {0}")]
+    Audit(#[from] AuditError),
 
     #[error("backend: {0}")]
     Backend(String),

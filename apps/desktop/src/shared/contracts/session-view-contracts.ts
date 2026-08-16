@@ -79,6 +79,37 @@ export const ThreadGoalSchema = z.object({
 })
 export type ThreadGoal = z.infer<typeof ThreadGoalSchema>
 
+export const WorkflowStateCountsSchema = z.object({
+  pending: z.number().int().nonnegative(),
+  ready: z.number().int().nonnegative(),
+  active: z.number().int().nonnegative(),
+  succeeded: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+})
+export type WorkflowStateCounts = z.infer<typeof WorkflowStateCountsSchema>
+
+export const WorkflowRunSummarySchema = z.object({
+  id: z.string().min(1),
+  runGoal: z.string(),
+  state: z.enum([
+    'planned', 'validated', 'running', 'cancelling', 'succeeded', 'failed', 'cancelled',
+  ]),
+  revision: z.number().int().nonnegative(),
+  outputNode: z.string().min(1),
+  counts: WorkflowStateCountsSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>
+
+export const WorkflowRunsSchema = z.object({
+  active: z.array(WorkflowRunSummarySchema),
+  recent: z.array(WorkflowRunSummarySchema),
+})
+export type WorkflowRuns = z.infer<typeof WorkflowRunsSchema>
+
 export const SessionViewSchema = z.object({
   revision: z.number().int().nonnegative(),
   historyTruncated: z.boolean(),
@@ -91,6 +122,7 @@ export const SessionViewSchema = z.object({
   backgroundTasks: z.array(BackgroundTaskSchema),
   crons: z.array(CronJobSchema),
   mcpServers: z.array(McpServerSchema),
+  workflows: WorkflowRunsSchema.default({ active: [], recent: [] }),
   goal: ThreadGoalSchema.optional(),
   hubDegradedSince: z.string().datetime().optional(),
 })

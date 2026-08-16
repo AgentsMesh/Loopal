@@ -23,13 +23,17 @@ use_repo(rules_ts_ext, "npm_typescript")
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 node.toolchain(node_version = "22.12.0")
 use_repo(node, "nodejs_toolchains")
+
 register_toolchains("@nodejs_toolchains//:all")
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
     name = "npm",
     custom_postinstalls = {"electron@43.1.0": "node install.js"},
-    data = ["//:package.json", "//:pnpm-workspace.yaml"],
+    data = [
+        "//:package.json",
+        "//:pnpm-workspace.yaml",
+    ],
     pnpm_lock = "//:pnpm-lock.yaml",
     verify_node_modules_ignored = "//:.bazelignore",
 )
@@ -42,10 +46,14 @@ bazel_dep(name = "rules_rust", version = "0.69.0")
 # The process_wrapper consolidates hundreds of -Ldependency= paths into a single
 # temporary directory via hard links, keeping PATH under the 32,767-char Win32 limit.
 # Safe to remove once upstream merges commits eb70659c + 22830c79.
+# The collector patch backports rules_rust commit 0a59de57's failed-export handling,
+# cleans its temporary profile on failure, and works around Bazel #28310 by restoring
+# owner-write permission before split coverage post-processing.
 single_version_override(
     module_name = "rules_rust",
     patch_strip = 1,
     patches = [
+        "//patches:rules_rust_coverage_fail_closed.patch",
         "//patches:rules_rust_windows_consolidate_deps.patch",
     ],
     version = "0.69.0",
@@ -53,10 +61,116 @@ single_version_override(
 
 # Rust toolchain
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+
+# Keep the release compiler on Rust 1.94. Branch coverage uses separate
+# producer/collector toolchains because LLVM 21.1.8 has an upstream
+# getInstantiationGroups crash for async/generic branch maps. These native-host
+# sets are selected only by //:rust_branch_toolchain, so ordinary builds and
+# tests never resolve them.
+rust.repository_set(
+    name = "rust_branch_macos_aarch64",
+    edition = "2024",
+    exec_triple = "aarch64-apple-darwin",
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:osx",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "aarch64-apple-darwin",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
+rust.repository_set(
+    name = "rust_branch_macos_x86_64",
+    edition = "2024",
+    exec_triple = "x86_64-apple-darwin",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:osx",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "x86_64-apple-darwin",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
+rust.repository_set(
+    name = "rust_branch_linux_x86_64",
+    edition = "2024",
+    exec_triple = "x86_64-unknown-linux-gnu",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "x86_64-unknown-linux-gnu",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
+rust.repository_set(
+    name = "rust_branch_linux_aarch64",
+    edition = "2024",
+    exec_triple = "aarch64-unknown-linux-gnu",
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "aarch64-unknown-linux-gnu",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
+rust.repository_set(
+    name = "rust_branch_windows_x86_64",
+    edition = "2024",
+    exec_triple = "x86_64-pc-windows-msvc",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "x86_64-pc-windows-msvc",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
+rust.repository_set(
+    name = "rust_branch_windows_aarch64",
+    edition = "2024",
+    exec_triple = "aarch64-pc-windows-msvc",
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:windows",
+    ],
+    target_settings = ["//:rust_branch_toolchain_enabled"],
+    target_triple = "aarch64-pc-windows-msvc",
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.92.0"],
+)
 rust.toolchain(
     edition = "2024",
-    urls = ["https://static.rust-lang.org/dist/{}.tar.xz", "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz", "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz"],
-    versions = ["1.94.0"],
     extra_target_triples = [
         "aarch64-apple-darwin",
         "x86_64-apple-darwin",
@@ -64,6 +178,13 @@ rust.toolchain(
         "aarch64-unknown-linux-gnu",
         "x86_64-pc-windows-msvc",
     ],
+    target_settings = ["//:rust_branch_toolchain_disabled"],
+    urls = [
+        "https://static.rust-lang.org/dist/{}.tar.xz",
+        "https://mirrors.sjtug.sjtu.edu.cn/rust-static/dist/{}.tar.xz",
+        "https://mirrors.ustc.edu.cn/rust-static/dist/{}.tar.xz",
+    ],
+    versions = ["1.94.0"],
 )
 use_repo(rust, "rust_toolchains")
 
@@ -73,52 +194,143 @@ register_toolchains("@rust_toolchains//:all")
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 
 # --- Serialization ---
-crate.spec(package = "serde", version = "1", features = ["derive"])
-crate.spec(package = "serde_json", version = "1")
-crate.spec(package = "serde_yaml", version = "0.9")
-crate.spec(package = "schemars", version = "1")
+crate.spec(
+    features = ["derive"],
+    package = "serde",
+    version = "1",
+)
+crate.spec(
+    package = "serde_json",
+    version = "1",
+)
+crate.spec(
+    package = "serde_yaml",
+    version = "0.9",
+)
+crate.spec(
+    package = "schemars",
+    version = "1",
+)
+crate.spec(
+    default_features = False,
+    package = "jsonschema",
+    version = "=0.49.7",
+)
 
 # --- Async runtime ---
-crate.spec(package = "tokio", version = "1", features = ["full", "test-util"])
-crate.spec(package = "futures", version = "0.3")
-crate.spec(package = "async-trait", version = "0.1")
-crate.spec(package = "tokio-util", version = "0.7")
-crate.spec(package = "tokio-stream", version = "0.1")
-crate.spec(package = "pin-project-lite", version = "0.2")
+crate.spec(
+    features = [
+        "full",
+        "test-util",
+    ],
+    package = "tokio",
+    version = "1",
+)
+crate.spec(
+    package = "futures",
+    version = "0.3",
+)
+crate.spec(
+    package = "async-trait",
+    version = "0.1",
+)
+crate.spec(
+    package = "tokio-util",
+    version = "0.7",
+)
+crate.spec(
+    package = "tokio-stream",
+    version = "0.1",
+)
+crate.spec(
+    package = "pin-project-lite",
+    version = "0.2",
+)
+crate.spec(
+    default_features = False,
+    features = [
+        "job-object",
+        "kill-on-drop",
+        "tokio1",
+    ],
+    package = "process-wrap",
+    version = "=9.1.0",
+)
+crate.annotation(
+    crate = "process-wrap",
+    patch_args = ["-p1"],
+    patches = ["//patches:process-wrap-9.1.0-job-kill-on-close.patch"],
+    version = "=9.1.0",
+)
 
 # --- Error handling ---
-crate.spec(package = "thiserror", version = "2")
-crate.spec(package = "anyhow", version = "1")
+crate.spec(
+    package = "thiserror",
+    version = "2",
+)
+crate.spec(
+    package = "anyhow",
+    version = "1",
+)
 
 # --- HTTP ---
-crate.spec(package = "reqwest", version = "0.13", default_features = False, features = [
-    "native-tls",
-    "charset",
-    "http2",
-    "json",
-    "stream",
-    "system-proxy",
-])
-crate.spec(package = "eventsource-stream", version = "0.2")
+crate.spec(
+    default_features = False,
+    features = [
+        "native-tls",
+        "charset",
+        "http2",
+        "json",
+        "stream",
+        "system-proxy",
+    ],
+    package = "reqwest",
+    version = "0.13",
+)
+crate.spec(
+    package = "eventsource-stream",
+    version = "0.2",
+)
 
 # --- CLI ---
-crate.spec(package = "clap", version = "4", features = ["derive"])
+crate.spec(
+    features = ["derive"],
+    package = "clap",
+    version = "4",
+)
 
 # --- TUI ---
-crate.spec(package = "ratatui", version = "0.30", features = ["crossterm"])
-crate.spec(package = "crossterm", version = "0.28")
+crate.spec(
+    features = ["crossterm"],
+    package = "ratatui",
+    version = "0.30",
+)
+crate.spec(
+    package = "crossterm",
+    version = "0.28",
+)
 
 # --- File operations ---
-crate.spec(package = "globset", version = "0.4")
-crate.spec(package = "ignore", version = "0.4")
-crate.spec(package = "regex", version = "1")
-crate.spec(package = "walkdir", version = "2")
+crate.spec(
+    package = "globset",
+    version = "0.4",
+)
+crate.spec(
+    package = "ignore",
+    version = "0.4",
+)
+crate.spec(
+    package = "regex",
+    version = "1",
+)
+crate.spec(
+    package = "walkdir",
+    version = "2",
+)
 
 # --- MCP ---
 # Union of all feature sets used across crates (main + test-support)
 crate.spec(
-    package = "rmcp",
-    version = "=1.7.0",
     features = [
         "client",
         "transport-child-process",
@@ -128,72 +340,275 @@ crate.spec(
         "macros",
         "transport-io",
     ],
+    package = "rmcp",
+    version = "=1.7.0",
 )
 
 # --- Scheduling ---
-crate.spec(package = "cron", version = "0.15")
-crate.spec(package = "rand", version = "0.9")
+crate.spec(
+    package = "cron",
+    version = "0.15",
+)
+crate.spec(
+    package = "rand",
+    version = "0.9",
+)
 
 # --- Utilities ---
-crate.spec(package = "parking_lot", version = "0.12")
-crate.spec(package = "dirs", version = "6")
-crate.spec(package = "indexmap", version = "2", features = ["serde"])
-crate.spec(package = "libc", version = "0.2")
-crate.spec(package = "sha2", version = "0.10")
-crate.spec(package = "windows-sys", version = "0.59", features = ["Win32_System_Console", "Win32_Foundation"])
-crate.spec(package = "uuid", version = "1", features = ["v4", "serde"])
-crate.spec(package = "chrono", version = "0.4", features = ["serde"])
-crate.spec(package = "tracing", version = "0.1")
-crate.spec(package = "tracing-subscriber", version = "0.3", features = ["env-filter", "registry"])
-crate.spec(package = "tracing-appender", version = "0.2")
-crate.spec(package = "opentelemetry", version = "0.28", features = ["trace", "metrics", "logs"])
-crate.spec(package = "opentelemetry_sdk", version = "0.28", features = ["trace", "metrics", "logs", "rt-tokio"])
-crate.spec(package = "opentelemetry-otlp", version = "0.28", features = ["trace", "metrics", "logs", "grpc-tonic"])
-crate.spec(package = "tracing-opentelemetry", version = "0.29")
-crate.spec(package = "opentelemetry-appender-tracing", version = "0.28")
-crate.spec(package = "unicode-width", version = "0.2")
-crate.spec(package = "textwrap", version = "0.16")
-crate.spec(package = "pulldown-cmark", version = "0.12", default_features = False)
-crate.spec(package = "syntect", version = "5", default_features = False, features = ["default-fancy"])
-crate.spec(package = "two-face", version = "0.5")
-crate.spec(package = "html2text", version = "0.12")
-crate.spec(package = "pdf-extract", version = "0.7")
-crate.spec(package = "tiktoken-rs", version = "0.6")
-crate.spec(package = "opener", version = "0.7")
+crate.spec(
+    package = "parking_lot",
+    version = "0.12",
+)
+crate.spec(
+    package = "dirs",
+    version = "6",
+)
+crate.spec(
+    features = ["serde"],
+    package = "indexmap",
+    version = "2",
+)
+crate.spec(
+    package = "libc",
+    version = "0.2",
+)
+crate.spec(
+    package = "sha2",
+    version = "0.10",
+)
+crate.spec(
+    features = [
+        "Win32_Foundation",
+        "Win32_Storage_FileSystem",
+        "Win32_System_Console",
+        "Win32_System_Threading",
+    ],
+    package = "windows-sys",
+    version = "0.59",
+)
+crate.spec(
+    features = [
+        "v4",
+        "serde",
+    ],
+    package = "uuid",
+    version = "1",
+)
+crate.spec(
+    features = ["serde"],
+    package = "chrono",
+    version = "0.4",
+)
+crate.spec(
+    package = "tracing",
+    version = "0.1",
+)
+crate.spec(
+    features = [
+        "env-filter",
+        "registry",
+    ],
+    package = "tracing-subscriber",
+    version = "0.3",
+)
+crate.spec(
+    package = "tracing-appender",
+    version = "0.2",
+)
+crate.spec(
+    features = [
+        "trace",
+        "metrics",
+        "logs",
+    ],
+    package = "opentelemetry",
+    version = "0.28",
+)
+crate.spec(
+    features = [
+        "trace",
+        "metrics",
+        "logs",
+        "rt-tokio",
+    ],
+    package = "opentelemetry_sdk",
+    version = "0.28",
+)
+crate.spec(
+    features = [
+        "trace",
+        "metrics",
+        "logs",
+        "grpc-tonic",
+    ],
+    package = "opentelemetry-otlp",
+    version = "0.28",
+)
+crate.spec(
+    package = "tracing-opentelemetry",
+    version = "0.29",
+)
+crate.spec(
+    package = "opentelemetry-appender-tracing",
+    version = "0.28",
+)
+crate.spec(
+    package = "unicode-width",
+    version = "0.2",
+)
+crate.spec(
+    package = "textwrap",
+    version = "0.16",
+)
+crate.spec(
+    default_features = False,
+    package = "pulldown-cmark",
+    version = "0.12",
+)
+crate.spec(
+    default_features = False,
+    features = ["default-fancy"],
+    package = "syntect",
+    version = "5",
+)
+crate.spec(
+    package = "two-face",
+    version = "0.5",
+)
+crate.spec(
+    package = "html2text",
+    version = "0.12",
+)
+crate.spec(
+    package = "pdf-extract",
+    version = "0.7",
+)
+crate.spec(
+    package = "tiktoken-rs",
+    version = "0.6",
+)
+crate.spec(
+    package = "opener",
+    version = "0.7",
+)
 
 # --- Image support ---
-crate.spec(package = "arboard", version = "3", features = ["image-data"])
-crate.spec(package = "base64", version = "0.22")
-crate.spec(package = "image", version = "0.25", default_features = False, features = ["png"])
+crate.spec(
+    features = ["image-data"],
+    package = "arboard",
+    version = "3",
+)
+crate.spec(
+    package = "base64",
+    version = "0.22",
+)
+crate.spec(
+    default_features = False,
+    features = ["png"],
+    package = "image",
+    version = "0.25",
+)
 
 # --- Templates ---
-crate.spec(package = "minijinja", version = "2", features = ["loader"])
-crate.spec(package = "include_dir", version = "0.7")
+crate.spec(
+    features = ["loader"],
+    package = "minijinja",
+    version = "2",
+)
+crate.spec(
+    package = "include_dir",
+    version = "0.7",
+)
 
 # --- Secrets ---
-crate.spec(package = "age", version = "0.10", features = ["armor", "ssh"])
-crate.spec(package = "secrecy", version = "0.10", features = ["serde"])
-crate.spec(package = "zeroize", version = "1", features = ["derive"])
-crate.spec(package = "aho-corasick", version = "1")
-crate.spec(package = "rpassword", version = "7")
-crate.spec(package = "once_cell", version = "1")
+crate.spec(
+    features = [
+        "armor",
+        "ssh",
+    ],
+    package = "age",
+    version = "0.10",
+)
+crate.spec(
+    features = ["serde"],
+    package = "secrecy",
+    version = "0.10",
+)
+crate.spec(
+    features = ["derive"],
+    package = "zeroize",
+    version = "1",
+)
+crate.spec(
+    package = "aho-corasick",
+    version = "1",
+)
+crate.spec(
+    package = "rpassword",
+    version = "7",
+)
+crate.spec(
+    package = "once_cell",
+    version = "1",
+)
 
 # --- ACP (Agent Client Protocol) ---
-crate.spec(package = "agent-client-protocol-schema", version = "0.11")
-crate.spec(package = "strum", version = "0.28", features = ["derive"])
-crate.spec(package = "derive_more", version = "2", features = ["from", "display"])
+crate.spec(
+    package = "agent-client-protocol-schema",
+    version = "0.11",
+)
+crate.spec(
+    features = ["derive"],
+    package = "strum",
+    version = "0.28",
+)
+crate.spec(
+    features = [
+        "from",
+        "display",
+    ],
+    package = "derive_more",
+    version = "2",
+)
 
 # --- Memory Graph / Embedded SQLite ---
-crate.spec(package = "rusqlite", version = "0.32", features = ["bundled", "chrono"])
-crate.spec(package = "notify", version = "6")
-crate.spec(package = "notify-debouncer-mini", version = "0.4")
-crate.spec(package = "unicode-segmentation", version = "1")
-crate.spec(package = "flate2", version = "1")
+crate.spec(
+    features = [
+        "bundled",
+        "chrono",
+    ],
+    package = "rusqlite",
+    version = "0.32",
+)
+crate.spec(
+    package = "notify",
+    version = "6",
+)
+crate.spec(
+    package = "notify-debouncer-mini",
+    version = "0.4",
+)
+crate.spec(
+    package = "unicode-segmentation",
+    version = "1",
+)
+crate.spec(
+    package = "flate2",
+    version = "1",
+)
 
 # --- Testing ---
-crate.spec(package = "tempfile", version = "3")
-crate.spec(package = "wiremock", version = "0.6")
-crate.spec(package = "filetime", version = "0.2")
-
+crate.spec(
+    package = "tempfile",
+    version = "3",
+)
+crate.spec(
+    package = "wiremock",
+    version = "0.6",
+)
+crate.spec(
+    package = "filetime",
+    version = "0.2",
+)
 crate.from_specs(name = "crates")
 use_repo(crate, "crates")

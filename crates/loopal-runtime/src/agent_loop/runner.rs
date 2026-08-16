@@ -3,11 +3,9 @@ use std::sync::Arc;
 
 use loopal_context::middleware::file_snapshot::FileSnapshot;
 use loopal_context::{TurnStore, TurnTracker};
-use loopal_error::{AgentOutput, Result};
-use loopal_protocol::{AgentEventPayload, AgentStatus, InterruptSignal};
+use loopal_protocol::{AgentStatus, InterruptSignal};
 use loopal_tool_api::{GoalSession, ToolContext};
 use tokio::sync::watch;
-use tracing::{Instrument, info, info_span};
 
 use super::AgentLoopParams;
 use super::continuation_gate::ContinuationGate;
@@ -28,22 +26,21 @@ pub struct AgentLoopRunner {
     pub model_config: ModelConfig,
     pub interrupt: InterruptSignal,
     pub interrupt_tx: Arc<watch::Sender<u64>>,
-    /// Decision-making governance chain (LoopDetector, future Watchdog).
     pub governance: Vec<Box<dyn Governance>>,
     /// Policy for combining per-governance verdicts into a final outcome.
     /// Default is `FirstDenyWins`; tests or future configs can replace it.
     pub aggregator: Box<dyn VerdictAggregator>,
-    /// Observation-only turn hooks (DiffTracker, future telemetry hooks).
     pub hooks: Vec<Box<dyn TurnHook>>,
     pub config_snapshots: Vec<FileSnapshot>,
-    /// Scheduler message receiver — consumed in `wait_for_input()`.
     pub trigger_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
     /// Async hook rewake channel — background hooks send Envelopes here.
     pub rewake_rx: Option<tokio::sync::mpsc::Receiver<loopal_protocol::Envelope>>,
-    /// Frontend envelopes received while suspended that are not allowed to
-    /// wake the session. They remain ordered and are consumed one per turn
-    /// after a Human envelope or Unsuspend reopens the session.
-    pub deferred_frontend_messages: VecDeque<loopal_protocol::Envelope>,
+    /// Frontend data received while suspended remains ordered and is consumed
+    /// after Unsuspend reopens the session.
+    pub deferred_frontend_inputs: VecDeque<crate::agent_input::AgentInput>,
+    /// Inputs drained at an ephemeral idle boundary. They are processed one
+    /// envelope per turn so each envelope retains its own workflow decision.
+    pub ephemeral_pending_inputs: VecDeque<loopal_protocol::Envelope>,
     /// Local status for idempotent `transition()` checks.
     ///
     /// This is NOT the authoritative status for external observers. The session
@@ -80,13 +77,10 @@ impl AgentLoopRunner {
         .with_one_shot_chat_opt(params.one_shot_chat.clone())
         .with_fetch_refiner_policy_opt(params.fetch_refiner_policy.clone())
         .with_goal_session_opt(goal_adapter)
+        .with_protected_effect_audit(params.deps.protected_effect_audit.clone())
         .with_secret_client_opt(params.deps.kernel.secret_client().cloned())
         .with_read_tracker(Arc::new(loopal_tool_api::FileReadTracker::new()));
-        let model_config = ModelConfig::from_model(
-            &params.config.model(),
-            params.config.thinking_config.clone(),
-            params.config.context_tokens_cap,
-        );
+        let model_config = ModelConfig::from_agent_config(&params.config);
         let interrupt = params.interrupt.signal.clone();
         let interrupt_tx = params.interrupt.tx.clone();
         let trigger_rx = params.scheduled_rx.take();
@@ -113,7 +107,8 @@ impl AgentLoopRunner {
             config_snapshots: Vec::new(),
             trigger_rx,
             rewake_rx,
-            deferred_frontend_messages: VecDeque::new(),
+            deferred_frontend_inputs: VecDeque::new(),
+            ephemeral_pending_inputs: VecDeque::new(),
             status: AgentStatus::Starting,
             plan_file,
             pending_consumed_ids: Vec::new(),
@@ -122,86 +117,5 @@ impl AgentLoopRunner {
             last_continuation_goal_id: None,
             turns,
         }
-    }
-
-    /// Main loop — orchestrates input, middleware, LLM, and tool execution.
-    /// Guarantees `Finished` event is emitted regardless of exit path.
-    pub async fn run(&mut self) -> Result<AgentOutput> {
-        let span = info_span!("agent", session.id = %self.params.session.id);
-        self.run_instrumented().instrument(span).await
-    }
-
-    /// Actual run logic, executed inside the `agent` span.
-    async fn run_instrumented(&mut self) -> Result<AgentOutput> {
-        info!(model = %self.params.config.model(), "agent loop started");
-        self.transition(AgentStatus::Running).await?;
-        self.emit(AgentEventPayload::Started).await?;
-        self.emit_cold_start_observables().await?;
-        self.emit_initial_mcp_status().await;
-        self.spawn_mcp_settle_emitter();
-        self.spawn_hub_health_poller();
-        self.fire_session_hook(loopal_config::HookEvent::SessionStart)
-            .await;
-
-        let result = self.run_loop().await;
-
-        self.fire_session_hook(loopal_config::HookEvent::SessionEnd)
-            .await;
-        self.cleanup_session_tmp().await;
-        self.emit_inbox_consumed().await;
-
-        if let Err(ref e) = result
-            && let Err(te) = self.transition_error(e.to_string()).await
-        {
-            tracing::error!(error = %te, original = %e, "transition_error during shutdown");
-        }
-        if let Err(e) = self.transition(AgentStatus::Finished).await {
-            tracing::error!(error = %e, "transition to Finished during shutdown");
-        }
-        result
-    }
-
-    /// Send an event payload via the frontend.
-    pub async fn emit(&self, payload: AgentEventPayload) -> Result<()> {
-        self.params.deps.frontend.emit(payload).await
-    }
-
-    /// Best-effort emit — log warn if the channel rejects but never
-    /// propagate. Use for cosmetic / progress events where a dropped
-    /// banner must not crash the agent loop (e.g. `/compact` progress,
-    /// recovery retry notice). Reserve `emit(...)?` for events whose
-    /// loss breaks an invariant (status transitions, InboxConsumed).
-    pub async fn emit_cosmetic(&self, payload: AgentEventPayload) {
-        if let Err(e) = self.params.deps.frontend.emit(payload).await {
-            tracing::warn!(error = %e, "cosmetic emit dropped; continuing");
-        }
-    }
-
-    /// Capability-checked emit — panics if called outside `scope_turn`.
-    /// Use from in-turn emit sites that MUST be scoped so missing scope
-    /// is a loud failure instead of a silent `turn_id=0`.
-    pub async fn emit_in_turn(&self, payload: AgentEventPayload) -> Result<()> {
-        self.params.deps.frontend.emit_in_turn(payload).await
-    }
-
-    /// Remove this session's tmp dir (`$TMPDIR/loopal/{id}/`).
-    /// Excludes log files of still-running background tasks.
-    pub(crate) async fn cleanup_session_tmp(&self) {
-        let exclude: Vec<std::path::PathBuf> = self
-            .params
-            .deps
-            .kernel
-            .bg_store()
-            .snapshot(loopal_tool_background::StatusFilter::Running)
-            .iter()
-            .filter_map(|s| {
-                self.params
-                    .deps
-                    .kernel
-                    .bg_store()
-                    .read_task(&s.id, |t| t.log_path().to_path_buf())
-            })
-            .collect();
-        loopal_backend::cleanup_session_tmp(&self.params.session.id, &exclude).await;
     }
 }

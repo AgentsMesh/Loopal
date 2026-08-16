@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 
 use crate::connection::McpConnection;
 use crate::handler::SamplingCallback;
-use crate::secret_expand::expand_mcp_config;
+use crate::manager_prepare::prepare_connection;
 
 pub struct McpManager {
     pub(crate) connections: IndexMap<String, McpConnection>,
@@ -39,10 +39,15 @@ impl McpManager {
         self.secret_client = Some(client);
     }
 
-    /// Start all configured MCP servers.
-    ///
-    /// Connections are established concurrently. Individual failures are logged;
-    /// returns error only if ALL servers fail.
+    pub(crate) fn secret_client(&self) -> Option<Arc<dyn SecretClient>> {
+        self.secret_client.clone()
+    }
+
+    pub(crate) fn sampling(&self) -> Option<Arc<dyn SamplingCallback>> {
+        self.sampling.clone()
+    }
+
+    /// Connects concurrently and errors only when all enabled servers fail.
     pub async fn start_all(
         &mut self,
         configs: &IndexMap<String, McpServerConfig>,
@@ -52,37 +57,30 @@ impl McpManager {
         self.absorb_connections(results)
     }
 
-    /// Snapshot sampling/secrets and expand placeholders without holding any
-    /// caller's lock. Returns unconnected `McpConnection` objects ready for
-    /// `connect_all`. Lets background spawn release the manager write lock
-    /// during the slow `connect()` phase.
+    /// Resolves config before the slow, lock-free connection phase.
     pub async fn prepare_connections(
         &self,
         configs: &IndexMap<String, McpServerConfig>,
     ) -> Vec<McpConnection> {
         let mut prepared = Vec::new();
-        for (name, cfg) in configs {
-            let resolved = expand_mcp_config(
-                cfg.clone(),
-                self.secret_client.as_ref(),
-                loopal_ipc::HUB_RPC_BUDGET,
-            )
-            .await;
-            if !resolved.enabled() {
-                info!(server = %name, "MCP server disabled, skipping");
-                continue;
-            }
-            prepared.push(McpConnection::new(
+        let secret_client = self.secret_client.clone();
+        let sampling = self.sampling.clone();
+        for (name, config) in configs {
+            if let Some(connection) = prepare_connection(
                 name.clone(),
-                resolved,
-                self.sampling.clone(),
-            ));
+                config.clone(),
+                secret_client.clone(),
+                sampling.clone(),
+            )
+            .await
+            {
+                prepared.push(connection);
+            }
         }
         prepared
     }
 
-    /// Insert already-connected (or already-failed) `McpConnection` objects
-    /// into manager state. Errors only when EVERY server failed to connect.
+    /// Commits settled connections and errors only when every server failed.
     pub fn absorb_connections(&mut self, results: Vec<McpConnection>) -> Result<(), McpError> {
         let total = results.len();
         let mut failure_count = 0;
@@ -144,6 +142,10 @@ impl McpManager {
             .connections
             .get(server)
             .ok_or_else(|| McpError::ServerNotFound(server.to_string()))?;
+        let sanitizer = conn
+            .result_sanitizer()
+            .await
+            .map_err(|message| McpError::Protocol(message.into()))?;
         let client = conn
             .client()
             .ok_or_else(|| McpError::TransportClosed(format!("'{server}' not connected")))?;
@@ -153,7 +155,8 @@ impl McpManager {
             None => serde_json::Map::new(),
         };
 
-        client.call_tool(name, json_args).await
+        let result = client.call_tool(name, json_args).await?;
+        Ok(sanitizer.sanitize(result))
     }
 
     /// Call a tool by name, auto-resolving the server.
@@ -177,10 +180,7 @@ impl McpManager {
     }
 }
 
-/// Lock-free concurrent connect — caller passes prepared `McpConnection`
-/// objects (see `prepare_connections`); this drives all `connect()` futures
-/// in parallel without any shared state, so a slow server cannot block
-/// other readers of the originating manager.
+/// Connects prepared servers concurrently without holding manager state.
 pub async fn connect_all(prepared: Vec<McpConnection>) -> Vec<McpConnection> {
     futures::future::join_all(prepared.into_iter().map(|mut conn| async move {
         conn.connect().await;

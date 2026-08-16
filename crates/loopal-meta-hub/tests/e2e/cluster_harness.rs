@@ -16,8 +16,6 @@ use serde_json::json;
 
 use loopal_meta_hub::MetaHub;
 
-// ── MetaHub handle ──────────────────────────────────────────────
-
 pub struct MetaHubHandle {
     pub meta_hub: Arc<Mutex<MetaHub>>,
     pub addr: String,
@@ -45,8 +43,6 @@ impl MetaHubHandle {
     }
 }
 
-// ── Hub handle ──────────────────────────────────────────────────
-
 #[allow(dead_code)]
 pub struct HubHandle {
     pub name: String,
@@ -59,9 +55,10 @@ pub struct HubHandle {
 impl HubHandle {
     /// Boot a Hub with a real agent process, connected to MetaHub.
     pub async fn boot(name: &str, meta: &MetaHubHandle) -> Self {
-        // Create Hub
         let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(256);
-        let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+        let mut hub = Hub::new(event_tx);
+        hub.set_protected_audit(Arc::new(loopal_vault_api::NoopAuditSink));
+        let hub = Arc::new(Mutex::new(hub));
 
         // Connect to MetaHub via TCP
         let stream = tokio::net::TcpStream::connect(&meta.addr)
@@ -109,6 +106,8 @@ impl HubHandle {
                 cwd: cwd.clone(),
                 mode: Some("act".to_string()),
                 no_sandbox: true,
+                sandbox_policy: None,
+                session_id: None,
                 ..Default::default()
             })
             .await
@@ -158,8 +157,6 @@ impl HubHandle {
         panic!("agent {} never became ready", self.name);
     }
 }
-
-// ── Helpers ─────────────────────────────────────────────────────
 
 fn create_mock_fixture(name: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!(

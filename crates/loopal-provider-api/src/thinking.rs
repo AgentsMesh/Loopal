@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use serde::{Deserialize, Serialize};
 
 /// What kind of thinking/reasoning the model natively supports.
@@ -42,6 +44,46 @@ pub enum EffortLevel {
     Max,
 }
 
+/// Runtime-mutable thinking setting shared with read-only request services.
+/// The agent loop owns the writer; planners only receive a reader so a
+/// `/thinking` switch cannot leave auxiliary requests on the startup value.
+#[derive(Debug, Clone)]
+pub struct SharedThinkingConfig(Arc<RwLock<ThinkingConfig>>);
+
+impl SharedThinkingConfig {
+    pub fn new(config: ThinkingConfig) -> Self {
+        Self(Arc::new(RwLock::new(config)))
+    }
+
+    pub fn get(&self) -> ThinkingConfig {
+        self.0
+            .read()
+            .expect("thinking config lock poisoned")
+            .clone()
+    }
+
+    pub fn set(&self, config: ThinkingConfig) {
+        *self.0.write().expect("thinking config lock poisoned") = config;
+    }
+
+    pub fn reader(&self) -> ThinkingConfigReader {
+        ThinkingConfigReader(self.0.clone())
+    }
+}
+
+/// Read-only view onto a [`SharedThinkingConfig`].
+#[derive(Debug, Clone)]
+pub struct ThinkingConfigReader(Arc<RwLock<ThinkingConfig>>);
+
+impl ThinkingConfigReader {
+    pub fn get(&self) -> ThinkingConfig {
+        self.0
+            .read()
+            .expect("thinking config lock poisoned")
+            .clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,5 +102,16 @@ mod tests {
             assert_eq!(json, format!("\"{expected}\""));
             assert_eq!(serde_json::from_str::<EffortLevel>(&json).unwrap(), level);
         }
+    }
+
+    #[test]
+    fn read_only_handle_observes_runtime_switches() {
+        let writer = SharedThinkingConfig::new(ThinkingConfig::Auto);
+        let reader = writer.reader();
+        assert!(matches!(reader.get(), ThinkingConfig::Auto));
+
+        writer.set(ThinkingConfig::Disabled);
+        assert!(matches!(writer.get(), ThinkingConfig::Disabled));
+        assert!(matches!(reader.get(), ThinkingConfig::Disabled));
     }
 }

@@ -7,6 +7,7 @@ use std::time::Duration;
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
+use crate::cluster_agent_driver::AgentDriver;
 use crate::cluster_harness::{HubHandle, MetaHubHandle};
 
 #[cfg(not(target_os = "windows"))]
@@ -16,19 +17,19 @@ async fn cluster_cross_hub_spawn_rejects_cwd_field() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "spawn-driver").await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({
-            "name": "child",
-            "prompt": "report your cwd",
-            "target_hub": "hub-b",
-            "cwd": "/attacker/path",
-        }),
-        "main".into(),
-    )
-    .await;
+    let result = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({
+                "name": "child",
+                "prompt": "report your cwd",
+                "target_hub": "hub-b",
+                "cwd": "/attacker/path",
+            }),
+        )
+        .await;
 
     let err = result.expect_err("MetaHub must reject cwd in cross-hub spawn");
     assert!(err.contains("cwd"), "got: {err}");
@@ -44,19 +45,19 @@ async fn cluster_cross_hub_spawn_rejects_fork_context() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "spawn-driver").await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({
-            "name": "child",
-            "prompt": "do work",
-            "target_hub": "hub-b",
-            "fork_context": [],
-        }),
-        "main".into(),
-    )
-    .await;
+    let result = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({
+                "name": "child",
+                "prompt": "do work",
+                "target_hub": "hub-b",
+                "fork_context": [],
+            }),
+        )
+        .await;
 
     let err = result.expect_err("must reject fork_context");
     assert!(err.contains("fork_context"), "got: {err}");
@@ -72,17 +73,17 @@ async fn cluster_cross_hub_spawn_validates_required_name() {
     let hub_a = HubHandle::boot("hub-a", &meta).await;
     let hub_b = HubHandle::boot("hub-b", &meta).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
+    let caller = AgentDriver::connect(hub_a.hub.clone(), "spawn-driver").await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
-        &hub_a.hub,
-        methods::HUB_SPAWN_AGENT.name,
-        json!({
-            "prompt": "do work",
-            "target_hub": "hub-b",
-        }),
-        "main".into(),
-    )
-    .await;
+    let result = caller
+        .request(
+            methods::HUB_SPAWN_AGENT.name,
+            json!({
+                "prompt": "do work",
+                "target_hub": "hub-b",
+            }),
+        )
+        .await;
 
     let err = result.expect_err("missing name must surface");
     assert!(err.contains("name"), "got: {err}");

@@ -69,6 +69,22 @@ pub fn reverse_project_messages_to_turns(messages: Vec<Message>) -> Vec<Turn> {
     turns
 }
 
+pub fn project_pending_messages_to_turns(messages: Vec<Message>) -> Vec<Turn> {
+    assert!(
+        matches!(
+            messages.last().map(|message| &message.role),
+            Some(MessageRole::User)
+        ),
+        "pending fixture messages must end with a user message"
+    );
+    let mut turns = reverse_project_messages_to_turns(messages);
+    turns
+        .last_mut()
+        .expect("pending fixture messages must project at least one turn")
+        .outcome = TurnOutcome::InProgress;
+    turns
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +113,16 @@ mod tests {
         let turns = reverse_project_messages_to_turns(vec![Message::assistant("response")]);
         assert_eq!(turns.len(), 1);
         assert!(matches!(turns[0].trigger, TurnTrigger::Resume));
+    }
+
+    #[test]
+    fn pending_messages_leave_only_the_last_turn_open() {
+        let turns = project_pending_messages_to_turns(vec![
+            Message::user("history"),
+            Message::assistant("done"),
+            Message::user("prompt"),
+        ]);
+        assert!(matches!(turns[0].outcome, TurnOutcome::Complete));
+        assert!(matches!(turns[1].outcome, TurnOutcome::InProgress));
     }
 }

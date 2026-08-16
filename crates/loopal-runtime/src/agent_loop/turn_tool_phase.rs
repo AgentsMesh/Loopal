@@ -3,7 +3,7 @@ use loopal_turn::{InjectionKind, TurnStep};
 use tracing::{info, warn};
 
 use super::runner::AgentLoopRunner;
-use super::streaming_tool_exec::{self, StreamingToolHandle, ToolUseArrived};
+use super::streaming_tool_exec::StreamingToolHandle;
 use super::turn_context::TurnContext;
 
 impl AgentLoopRunner {
@@ -14,23 +14,7 @@ impl AgentLoopRunner {
     ) -> Result<()> {
         self.update_fork_snapshot(&tool_uses);
 
-        let kernel = std::sync::Arc::clone(&self.params.deps.kernel);
-        let mut early_handle = StreamingToolHandle::empty();
-        for (idx, (id, name, input)) in tool_uses.iter().enumerate() {
-            streaming_tool_exec::feed_tool(
-                &mut early_handle,
-                &kernel,
-                &self.tool_ctx,
-                self.params.config.mode,
-                &ToolUseArrived {
-                    index: idx,
-                    id: id.clone(),
-                    name: name.clone(),
-                    input: input.clone(),
-                },
-                self.params.deps.frontend.event_emitter(),
-            );
-        }
+        let early_handle = StreamingToolHandle::empty();
 
         let tool_names: Vec<&str> = tool_uses.iter().map(|(_, n, _)| n.as_str()).collect();
         info!(tool_count = tool_uses.len(), ?tool_names, "tool exec start");

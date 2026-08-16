@@ -28,7 +28,7 @@ impl ControlOutcome {
     }
 }
 
-fn persist_local_setting(cwd: &str, key: &str, value: serde_json::Value) {
+pub(super) fn persist_local_setting(cwd: &str, key: &str, value: serde_json::Value) {
     let cwd = PathBuf::from(cwd);
     if let Err(e) = loopal_config::update_local_settings_field(&cwd, key, value) {
         error!(error = %e, key, "failed to persist setting to settings.local.json");
@@ -87,27 +87,7 @@ impl AgentLoopRunner {
                 return self.handle_rewind(turn_index).await;
             }
             ControlCommand::ThinkingSwitch(json) => {
-                match serde_json::from_str::<loopal_provider_api::ThinkingConfig>(&json) {
-                    Ok(config) => {
-                        info!(thinking = ?config, "switching thinking config");
-                        // Emit-first; on failure the runner keeps the old
-                        // thinking config and view-state is not misinformed.
-                        self.emit(AgentEventPayload::ThinkingChanged {
-                            thinking_config: json,
-                        })
-                        .await?;
-                        self.model_config.thinking = config.clone();
-                        if let Ok(value) = serde_json::to_value(&config) {
-                            persist_local_setting(&self.params.session.cwd, "thinking", value);
-                        }
-                    }
-                    Err(e) => {
-                        error!(error = %e, "invalid thinking config");
-                        return Ok(ControlOutcome::rejected(format!(
-                            "invalid thinking config: {e}"
-                        )));
-                    }
-                }
+                return self.handle_thinking_switch(json).await;
             }
             ControlCommand::PermissionModeSwitch(s) => {
                 return self.handle_permission_switch(s).await;

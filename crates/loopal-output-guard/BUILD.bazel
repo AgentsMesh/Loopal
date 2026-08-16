@@ -1,0 +1,33 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-output-guard",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-protocol",
+        "//crates/loopal-tool-invocation",
+        "@crates//:aho-corasick",
+        "@crates//:base64",
+        "@crates//:secrecy",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+        "@crates//:zeroize",
+    ],
+)
+
+rust_test(
+    name = "loopal-output-guard_test",
+    srcs = glob(["tests/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-output-guard",
+        "//crates/loopal-protocol",
+        "//crates/loopal-tool-invocation",
+        "@crates//:base64",
+        "@crates//:secrecy",
+        "@crates//:serde_json",
+    ],
+)

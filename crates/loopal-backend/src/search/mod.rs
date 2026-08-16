@@ -14,7 +14,6 @@ mod glob;
 mod grep;
 mod grep_file;
 mod grep_match;
-pub(crate) mod overflow_fmt;
 mod walker;
 
 pub use glob::glob_search;

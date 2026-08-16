@@ -1,0 +1,206 @@
+diff --git a/src/tokio/job_object.rs b/src/tokio/job_object.rs
+--- a/src/tokio/job_object.rs
++++ b/src/tokio/job_object.rs
+@@ -1,6 +1,6 @@
+ use std::{future::Future, io::Result, pin::Pin, process::ExitStatus, time::Duration};
+ 
+-use tokio::{process::Command, task::spawn_blocking};
++use tokio::process::Command;
+ #[cfg(feature = "tracing")]
+ use tracing::{debug, instrument};
+ use windows::Win32::{
+@@ -15,8 +15,6 @@
+ 
+ #[cfg(feature = "creation-flags")]
+ use super::CreationFlags;
+-#[cfg(feature = "kill-on-drop")]
+-use super::KillOnDrop;
+ use super::{ChildWrapper, CommandWrap, CommandWrapper};
+ 
+ /// Wrapper which creates a job object context for a `Command`.
+@@ -54,10 +52,7 @@
+ 		inner: Box<dyn ChildWrapper>,
+ 		core: &CommandWrap,
+ 	) -> Result<Box<dyn ChildWrapper>> {
+-		#[cfg(feature = "kill-on-drop")]
+-		let kill_on_drop = core.has_wrap::<KillOnDrop>();
+-		#[cfg(not(feature = "kill-on-drop"))]
+-		let kill_on_drop = false;
++		let kill_on_drop = true;
+ 
+ 		#[cfg(feature = "creation-flags")]
+ 		let create_suspended = core
+@@ -139,33 +134,31 @@
+ 				return Ok(*status);
+ 			}
+ 
+-			const MAX_RETRY_ATTEMPT: usize = 10;
+-
+-			// always wait for parent to exit first, as by the time it does,
+-			// it's likely that all its children have already exited.
+ 			let status = self.inner.wait().await?;
+-			self.exit_status = ChildExitStatus::Exited(status);
+-
+-			// nevertheless, now try reaping all children a few times...
+-			for _ in 1..MAX_RETRY_ATTEMPT {
+-				if wait_on_job(self.job_port.completion_port, Some(Duration::ZERO))?.is_break() {
+-					return Ok(status);
++			if wait_on_job(self.job_port.completion_port, Some(Duration::ZERO))?.is_continue() {
++				terminate_job(self.job_port.job, 1)?;
++				while wait_on_job(self.job_port.completion_port, Some(Duration::ZERO))?.is_continue() {
++					tokio::task::yield_now().await;
+ 				}
+ 			}
+-
+-			// ...finally, if there are some that are still alive,
+-			// block in the background to reap them fully.
+-			let JobPort {
+-				completion_port, ..
+-			} = self.job_port;
+-			let _ = spawn_blocking(move || wait_on_job(completion_port, None)).await??;
++			self.exit_status = ChildExitStatus::Exited(status);
+ 			Ok(status)
+ 		})
+ 	}
+ 
+ 	#[cfg_attr(feature = "tracing", instrument(level = "debug", skip(self)))]
+ 	fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
+-		let _ = wait_on_job(self.job_port.completion_port, Some(Duration::ZERO))?;
+-		self.inner.try_wait()
++		if let ChildExitStatus::Exited(status) = &self.exit_status {
++			return Ok(Some(*status));
++		}
++		let Some(status) = self.inner.try_wait()? else {
++			return Ok(None);
++		};
++		if wait_on_job(self.job_port.completion_port, Some(Duration::ZERO))?.is_continue() {
++			terminate_job(self.job_port.job, 1)?;
++			return Ok(None);
++		}
++		self.exit_status = ChildExitStatus::Exited(status);
++		Ok(Some(status))
+ 	}
+ }
+diff --git a/src/windows.rs b/src/windows.rs
+--- a/src/windows.rs
++++ b/src/windows.rs
+@@ -1,7 +1,7 @@
+ //! Windows API support functions.
+ 
+ use std::{
+-	io::{Error, Result},
++	io::{Error, ErrorKind, Result},
+ 	ops::ControlFlow,
+ 	time::Duration,
+ };
+@@ -9,7 +9,7 @@
+ #[cfg(feature = "tracing")]
+ use tracing::{debug, instrument};
+ use windows::Win32::{
+-	Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
++	Foundation::{CloseHandle, ERROR_NO_MORE_FILES, HANDLE, INVALID_HANDLE_VALUE},
+ 	System::{
+ 		Diagnostics::ToolHelp::{
+ 			CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
+@@ -135,23 +135,36 @@
+ 			tpDeltaPri: 0,
+ 			dwFlags: 0,
+ 		};
+-
+-		let mut res = unsafe { Thread32First(tool_handle, &mut entry) };
+-		while res.is_ok() {
+-			if entry.th32OwnerProcessID == pid {
+-				let thread_handle =
+-					unsafe { OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID) }?;
+-				if unsafe { ResumeThread(thread_handle) } == u32::MAX {
+-					unsafe { CloseHandle(thread_handle) }?;
+-					return Err(Error::last_os_error());
++		let mut resumed = false;
++		let mut result = unsafe { Thread32First(tool_handle, &mut entry) };
++		loop {
++			match result {
++				Ok(()) => {
++					if entry.th32OwnerProcessID == pid {
++						let thread_handle = unsafe {
++							OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID)
++						}?;
++						if unsafe { ResumeThread(thread_handle) } == u32::MAX {
++							unsafe { CloseHandle(thread_handle) }?;
++							return Err(Error::last_os_error());
++						}
++						unsafe { CloseHandle(thread_handle) }?;
++						resumed = true;
++					}
++					result = unsafe { Thread32Next(tool_handle, &mut entry) };
+ 				}
+-				unsafe { CloseHandle(thread_handle) }?;
++				Err(error) if error.code() == ERROR_NO_MORE_FILES.to_hresult() => break,
++				Err(error) => return Err(Error::other(error)),
+ 			}
+-
+-			res = unsafe { Thread32Next(tool_handle, &mut entry) };
+-		}
+-
+-		Ok(())
++		}
++		if resumed {
++			Ok(())
++		} else {
++			Err(Error::new(
++				ErrorKind::NotFound,
++				"suspended child thread was not found",
++			))
++		}
+ 	}
+ 
+ 	let child_id = unsafe { GetProcessId(child_process) };
+@@ -173,26 +186,26 @@
+ 	completion_port: PortHandle,
+ 	timeout: Option<Duration>,
+ ) -> Result<ControlFlow<()>> {
+-	let mut code: u32 = 0;
+-	let mut key: usize = 0;
+-	let mut overlapped = OVERLAPPED::default();
+-	let mut lp_overlapped = &mut overlapped as *mut OVERLAPPED;
+-
+-	let result = unsafe {
+-		GetQueuedCompletionStatus(
+-			completion_port.0,
+-			&mut code,
+-			&mut key,
+-			&mut lp_overlapped as *mut _,
+-			timeout.map_or(INFINITE, |d| d.as_millis().try_into().unwrap_or(INFINITE)),
+-		)
+-	};
+-
+-	// ignore timing out errors unless the timeout was specified to INFINITE
+-	// https://docs.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus
+-	if timeout.is_some() && result.is_err() && lp_overlapped.is_null() {
+-		return Ok(ControlFlow::Continue(()));
+-	}
+-
+-	Ok(ControlFlow::Break(()))
+-}
++	loop {
++		let mut code: u32 = 0;
++		let mut key: usize = 0;
++		let mut overlapped = OVERLAPPED::default();
++		let mut lp_overlapped = &mut overlapped as *mut OVERLAPPED;
++		let result = unsafe {
++			GetQueuedCompletionStatus(
++				completion_port.0,
++				&mut code,
++				&mut key,
++				&mut lp_overlapped as *mut _,
++				timeout.map_or(INFINITE, |d| d.as_millis().try_into().unwrap_or(INFINITE)),
++			)
++		};
++		if timeout.is_some() && result.is_err() && lp_overlapped.is_null() {
++			return Ok(ControlFlow::Continue(()));
++		}
++		result.map_err(Error::other)?;
++		if code == 4 {
++			return Ok(ControlFlow::Break(()));
++		}
++	}
++}

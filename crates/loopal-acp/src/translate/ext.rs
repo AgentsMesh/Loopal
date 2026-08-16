@@ -5,6 +5,8 @@
 
 use serde_json::Value;
 
+use loopal_protocol::WorkflowRunSummary;
+
 /// Build an ACP extension notification params value.
 ///
 /// Extension methods are prefixed with `_` per ACP spec.
@@ -96,6 +98,16 @@ pub fn cleared(session_id: &str, context_window: u32) -> (String, Value) {
         session_id,
         "cleared",
         serde_json::json!({ "contextWindow": context_window }),
+    )
+}
+
+/// Build the typed workflow projection notification shared by live events and
+/// cold-start snapshot replay.
+pub fn workflow_run_changed(session_id: &str, workflow: &WorkflowRunSummary) -> (String, Value) {
+    ext_notification(
+        session_id,
+        "workflow",
+        serde_json::json!({ "workflow": workflow }),
     )
 }
 

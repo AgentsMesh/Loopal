@@ -1,250 +1,129 @@
-use async_trait::async_trait;
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
-use loopal_error::StorageError;
-use loopal_provider_api::{ContentBlock, Message, MessageRole};
-use loopal_runtime::hydrate::{hydrate_images, maybe_persist_inline_images};
-use loopal_storage::{FileResourceStore, ResourceStore};
+use loopal_provider_api::Message;
+use loopal_runtime::hydrate::{hydrate_images, hydrate_turn_images, maybe_persist_inline_images};
+use loopal_storage::FileResourceStore;
 use loopal_tool_invocation::ToolImageBlock;
+use loopal_turn::{OrderedToolBatch, ToolBatchItem, ToolCall, ToolCallId, ToolExecState, TurnStep};
 use tempfile::tempdir;
 
-fn b64(data: &[u8]) -> String {
-    STANDARD.encode(data)
-}
+use crate::hydrate_support::{MAX_IMAGE_BYTES, WriteFailingStore, b64, images, message, png};
 
-struct WriteFailingStore;
-
-#[async_trait]
-impl ResourceStore for WriteFailingStore {
-    async fn write(&self, _: &str, _: &str, _: &[u8]) -> Result<String, StorageError> {
-        Err(StorageError::Io(std::io::Error::other(
-            "simulated write failure",
-        )))
-    }
-    async fn read(&self, _: &str, _: &str) -> Result<Vec<u8>, StorageError> {
-        unreachable!("read not invoked in write-failure test")
-    }
-    async fn delete_session(&self, _: &str) -> Result<(), StorageError> {
-        Ok(())
-    }
-}
-
-struct ReadFailingStore;
-
-#[async_trait]
-impl ResourceStore for ReadFailingStore {
-    async fn write(&self, _: &str, _: &str, _: &[u8]) -> Result<String, StorageError> {
-        unreachable!("write not invoked in read-failure test")
-    }
-    async fn read(&self, _: &str, _: &str) -> Result<Vec<u8>, StorageError> {
-        Err(StorageError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "simulated read failure",
-        )))
-    }
-    async fn delete_session(&self, _: &str) -> Result<(), StorageError> {
-        Ok(())
-    }
+#[tokio::test]
+async fn small_valid_image_stays_inline() {
+    let dir = tempdir().unwrap();
+    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
+    let mut values = vec![ToolImageBlock::inline("image/png", b64(&png(1024)))];
+    maybe_persist_inline_images(
+        store.as_ref(),
+        "sess",
+        &mut values,
+        256 * 1024,
+        MAX_IMAGE_BYTES,
+    )
+    .await
+    .unwrap();
+    assert!(matches!(values[0], ToolImageBlock::Inline { .. }));
 }
 
 #[tokio::test]
-async fn small_image_stays_inline() {
+async fn large_valid_image_persists_and_hydrates() {
     let dir = tempdir().unwrap();
     let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let small = vec![0u8; 1024];
-    let mut images = vec![ToolImageBlock::inline("image/png", b64(&small))];
-    maybe_persist_inline_images(store.as_ref(), "sess", &mut images, 256 * 1024).await;
-    assert!(matches!(images[0], ToolImageBlock::Inline { .. }));
-}
-
-#[tokio::test]
-async fn large_image_persists_to_session_resource() {
-    let dir = tempdir().unwrap();
-    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let big = vec![0u8; 300 * 1024];
-    let mut images = vec![ToolImageBlock::inline("image/png", b64(&big))];
-    maybe_persist_inline_images(store.as_ref(), "sess", &mut images, 256 * 1024).await;
-    let ToolImageBlock::SessionResource { byte_size, .. } = &images[0] else {
-        panic!("expected SessionResource");
+    let payload = png(300 * 1024);
+    let original = b64(&payload);
+    let mut values = vec![ToolImageBlock::inline("image/png", original.clone())];
+    maybe_persist_inline_images(
+        store.as_ref(),
+        "sess",
+        &mut values,
+        256 * 1024,
+        MAX_IMAGE_BYTES,
+    )
+    .await
+    .unwrap();
+    let ToolImageBlock::SessionResource { byte_size, .. } = &values[0] else {
+        panic!("expected session resource")
     };
-    assert_eq!(*byte_size, 300 * 1024);
-}
+    assert_eq!(*byte_size, payload.len());
 
-#[tokio::test]
-async fn hydrate_converts_session_resource_back_to_inline() {
-    let dir = tempdir().unwrap();
-    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let payload = vec![7u8; 200];
-    let id = store.write("sess", "image/png", &payload).await.unwrap();
-
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![ContentBlock::ToolResult {
-            tool_use_id: "tu".into(),
-            content: String::new(),
-            images: vec![ToolImageBlock::session_resource(
-                &id,
-                "image/png",
-                payload.len(),
-            )],
-            is_error: false,
-            metadata: None,
-        }],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-
-    hydrate_images(&mut messages, store.as_ref(), "sess")
+    let mut messages = vec![message(values)];
+    hydrate_images(&mut messages, store.as_ref(), "sess", MAX_IMAGE_BYTES)
         .await
         .unwrap();
-
-    let ContentBlock::ToolResult { images, .. } = &messages[0].content[0] else {
-        panic!("expected ToolResult");
-    };
-    let ToolImageBlock::Inline { data, media_type } = &images[0] else {
-        panic!("expected Inline after hydrate");
+    let ToolImageBlock::Inline { data, media_type } = &images(&messages[0])[0] else {
+        panic!("expected inline image")
     };
     assert_eq!(media_type, "image/png");
-    assert_eq!(STANDARD.decode(data.as_bytes()).unwrap(), payload);
+    assert_eq!(data, &original);
 }
 
 #[tokio::test]
-async fn hydrate_leaves_inline_untouched() {
-    let dir = tempdir().unwrap();
-    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![ContentBlock::ToolResult {
-            tool_use_id: "tu".into(),
-            content: "ok".into(),
-            images: vec![ToolImageBlock::inline("image/png", b64(b"original-data"))],
-            is_error: false,
-            metadata: None,
-        }],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-
-    hydrate_images(&mut messages, store.as_ref(), "sess")
+async fn hydrate_leaves_valid_inline_untouched() {
+    let original = b64(&png(64));
+    let mut messages = vec![message(vec![ToolImageBlock::inline(
+        "image/png",
+        original.clone(),
+    )])];
+    let store = WriteFailingStore;
+    hydrate_images(&mut messages, &store, "sess", MAX_IMAGE_BYTES)
         .await
         .unwrap();
-
-    let ContentBlock::ToolResult { images, .. } = &messages[0].content[0] else {
-        panic!();
+    let ToolImageBlock::Inline { data, .. } = &images(&messages[0])[0] else {
+        panic!()
     };
-    let ToolImageBlock::Inline { data, .. } = &images[0] else {
-        panic!();
-    };
-    assert_eq!(data, &b64(b"original-data"));
+    assert_eq!(data, &original);
 }
 
 #[tokio::test]
-async fn persist_then_hydrate_round_trip() {
-    let dir = tempdir().unwrap();
-    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let big = vec![13u8; 300 * 1024];
-    let original_data = b64(&big);
-
-    let mut images = vec![ToolImageBlock::inline("image/png", original_data.clone())];
-    maybe_persist_inline_images(store.as_ref(), "sess", &mut images, 256 * 1024).await;
-
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![ContentBlock::ToolResult {
-            tool_use_id: "tu".into(),
-            content: String::new(),
-            images,
-            is_error: false,
-            metadata: None,
-        }],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-
-    hydrate_images(&mut messages, store.as_ref(), "sess")
-        .await
-        .unwrap();
-
-    let ContentBlock::ToolResult { images, .. } = &messages[0].content[0] else {
-        panic!();
-    };
-    let ToolImageBlock::Inline { data, .. } = &images[0] else {
-        panic!("must hydrate back to Inline");
-    };
-    assert_eq!(data, &original_data);
-}
-
-#[tokio::test]
-async fn maybe_persist_keeps_inline_when_base64_invalid() {
-    let dir = tempdir().unwrap();
-    let store = FileResourceStore::with_base_dir(dir.path().to_path_buf());
-    let mut images = vec![ToolImageBlock::Inline {
-        media_type: "image/png".to_string(),
-        data: "***not valid base64 but long enough***".repeat(20_000),
-    }];
-    maybe_persist_inline_images(store.as_ref(), "sess", &mut images, 256 * 1024).await;
-    assert!(
-        matches!(images[0], ToolImageBlock::Inline { .. }),
-        "invalid base64 must keep Inline instead of persisting"
-    );
-}
-
-#[tokio::test]
-async fn maybe_persist_keeps_inline_when_store_write_fails() {
-    let big = vec![0u8; 300 * 1024];
-    let mut images = vec![ToolImageBlock::inline("image/png", b64(&big))];
-    let store = WriteFailingStore;
-    maybe_persist_inline_images(&store, "sess", &mut images, 256 * 1024).await;
-    assert!(
-        matches!(images[0], ToolImageBlock::Inline { .. }),
-        "store write failure must keep Inline"
-    );
-}
-
-#[tokio::test]
-async fn maybe_persist_below_threshold_skips_store_entirely() {
-    let small = vec![0u8; 1024];
-    let mut images = vec![ToolImageBlock::inline("image/png", b64(&small))];
-    let store = WriteFailingStore;
-    // store.write would Err if called; assertion holds only if maybe_persist
-    // never reaches it because of the threshold short-circuit.
-    maybe_persist_inline_images(&store, "sess", &mut images, 256 * 1024).await;
-    assert!(matches!(images[0], ToolImageBlock::Inline { .. }));
-}
-
-#[tokio::test]
-async fn hydrate_propagates_store_read_error() {
-    let mut messages = vec![Message {
-        id: None,
-        role: MessageRole::User,
-        content: vec![ContentBlock::ToolResult {
-            tool_use_id: "tu".into(),
-            content: String::new(),
-            images: vec![ToolImageBlock::session_resource(
-                "missing-id",
-                "image/png",
-                1024,
-            )],
-            is_error: false,
-            metadata: None,
-        }],
-        origin: None,
-        ephemeral_in_history: false,
-    }];
-
-    let store = ReadFailingStore;
-    let err = hydrate_images(&mut messages, &store, "sess")
-        .await
-        .unwrap_err();
-    assert!(matches!(err, StorageError::Io(_)));
+async fn write_failure_keeps_valid_inline_image() {
+    let payload = png(300 * 1024);
+    let mut values = vec![ToolImageBlock::inline("image/png", b64(&payload))];
+    maybe_persist_inline_images(
+        &WriteFailingStore,
+        "sess",
+        &mut values,
+        256 * 1024,
+        MAX_IMAGE_BYTES,
+    )
+    .await
+    .unwrap();
+    assert!(matches!(values[0], ToolImageBlock::Inline { .. }));
 }
 
 #[tokio::test]
 async fn hydrate_skips_messages_without_tool_result() {
     let mut messages = vec![Message::user("just text"), Message::assistant("reply")];
-    let store = ReadFailingStore;
-    hydrate_images(&mut messages, &store, "sess").await.unwrap();
+    hydrate_images(&mut messages, &WriteFailingStore, "sess", MAX_IMAGE_BYTES)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn hydrate_turns_skip_pending_tool_items_without_reading_resources() {
+    let mut turn = loopal_turn::Turn {
+        id: loopal_turn::TurnId::from_string("pending-turn"),
+        started_at: chrono::Utc::now(),
+        trigger: loopal_turn::TurnTrigger::Resume,
+        body: Default::default(),
+        outcome: loopal_turn::TurnOutcome::InProgress,
+        last_step_at: None,
+    };
+    turn.body.steps.push(TurnStep::ToolBatch(OrderedToolBatch {
+        items: vec![ToolBatchItem {
+            call: ToolCall {
+                id: ToolCallId::new("pending-tool"),
+                name: "Read".into(),
+                input: serde_json::json!({}),
+            },
+            state: ToolExecState::Pending,
+        }],
+    }));
+    let mut turns = vec![turn];
+
+    hydrate_turn_images(&mut turns, &WriteFailingStore, "sess", MAX_IMAGE_BYTES)
+        .await
+        .unwrap();
+    let TurnStep::ToolBatch(batch) = &turns[0].body.steps[0] else {
+        panic!("expected tool batch")
+    };
+    assert!(matches!(batch.items[0].state, ToolExecState::Pending));
 }

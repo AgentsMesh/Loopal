@@ -58,6 +58,7 @@ fn build_params_with_config(
             frontend,
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: super::noop_protected_effect_audit(),
         },
         fixture.test_session("rt-test"),
         make_test_budget(),
@@ -195,8 +196,7 @@ pub fn make_interactive_multi_runner(
         vec![],
         PermissionMode::Bypass,
     );
-    let mut runner = AgentLoopRunner::new(params);
-    runner.start_turn_record(loopal_turn::TurnTrigger::Resume);
+    let runner = AgentLoopRunner::new(params);
     (runner, event_rx, mbox_tx, ctrl_tx)
 }
 

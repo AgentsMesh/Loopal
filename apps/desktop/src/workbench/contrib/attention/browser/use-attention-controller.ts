@@ -93,9 +93,14 @@ export function useAttentionController(
           attentionRequestId(item) === id && activeScope(item)
         ))
         if (!request) return
+        const responseDecision = decision === 'allow' ? 'allow_once' : decision
+        if (responseDecision !== 'deny' && !request.intentDigest) {
+          throw new Error('Permission intent digest is required to allow a tool')
+        }
         await api.respondPermission({
           ...requestScope(request), requestId: request.id,
-          decision: decision === 'allow' ? 'allow_once' : decision,
+          ...(request.intentDigest ? { intentDigest: request.intentDigest } : {}),
+          decision: responseDecision,
         })
       }),
       onAnswerQuestion: (id, choiceId) => run(async () => {
@@ -148,9 +153,7 @@ export function useAttentionController(
 interface RuntimeScope {
   readonly sessionId: string; readonly runtimeId: string; readonly generation: number
 }
-interface AttentionScope extends RuntimeScope {
-  readonly agentId: string
-}
+interface AttentionScope extends RuntimeScope { readonly agentId: string }
 function requestScope(value: AttentionScope): AttentionScope {
   return {
     sessionId: value.sessionId, runtimeId: value.runtimeId, generation: value.generation,

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, ToolContext, ToolResult, TypedTool};
+use loopal_tool_api::{ImageOutputPolicy, PermissionLevel, ToolContext, ToolResult, TypedTool};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -27,6 +27,10 @@ impl TypedTool<ReadImageParams> for ReadImageTool {
 
     fn permission(&self) -> PermissionLevel {
         PermissionLevel::ReadOnly
+    }
+
+    fn image_output_policy(&self) -> ImageOutputPolicy {
+        ImageOutputPolicy::ValidatedInline
     }
 
     fn secret_eligible_params(&self) -> &'static [&'static str] {

@@ -33,6 +33,22 @@ mod event_test;
 mod file_size_cap_test;
 #[path = "suite/mcp_snapshot_test.rs"]
 mod mcp_snapshot_test;
+#[path = "suite/permission_action_test.rs"]
+mod permission_action_test;
+#[path = "suite/permission_decision_audit_test.rs"]
+mod permission_decision_audit_test;
+#[path = "suite/permission_intent_test.rs"]
+mod permission_intent_test;
+#[path = "suite/permission_receipt_error_test.rs"]
+mod permission_receipt_error_test;
+#[path = "suite/permission_receipt_test.rs"]
+mod permission_receipt_test;
+#[path = "suite/permission_request_test.rs"]
+mod permission_request_test;
+#[path = "suite/protected_effect_audit_test.rs"]
+mod protected_effect_audit_test;
+#[path = "suite/protocol_branch_close_test.rs"]
+mod protocol_branch_close_test;
 #[path = "suite/task_snapshot_test.rs"]
 mod task_snapshot_test;
 #[path = "suite/thread_goal_test.rs"]
@@ -41,3 +57,39 @@ mod thread_goal_test;
 mod ui_capabilities_test;
 #[path = "suite/user_content_test.rs"]
 mod user_content_test;
+#[path = "suite/workflow_cancel_edge_test.rs"]
+mod workflow_cancel_edge_test;
+#[path = "suite/workflow_capability_test.rs"]
+mod workflow_capability_test;
+#[path = "suite/workflow_coverage_test.rs"]
+mod workflow_coverage_test;
+#[path = "suite/workflow_dependency_budget_test.rs"]
+mod workflow_dependency_budget_test;
+#[path = "suite/workflow_planner_schema_test.rs"]
+mod workflow_planner_schema_test;
+#[path = "suite/workflow_planner_test.rs"]
+mod workflow_planner_test;
+#[path = "suite/workflow_reducer_branch_matrix_test.rs"]
+mod workflow_reducer_branch_matrix_test;
+#[path = "suite/workflow_reducer_test.rs"]
+mod workflow_reducer_test;
+#[path = "suite/workflow_regression_test.rs"]
+mod workflow_regression_test;
+#[path = "suite/workflow_request_ledger_test.rs"]
+mod workflow_request_ledger_test;
+#[path = "suite/workflow_retry_capacity_test.rs"]
+mod workflow_retry_capacity_test;
+#[path = "suite/workflow_retry_output_test.rs"]
+mod workflow_retry_output_test;
+#[path = "suite/workflow_strict_wire_test.rs"]
+mod workflow_strict_wire_test;
+#[path = "suite/workflow_support.rs"]
+mod workflow_support;
+#[path = "suite/workflow_terminal_test.rs"]
+mod workflow_terminal_test;
+#[path = "suite/workflow_validation_branch_test.rs"]
+mod workflow_validation_branch_test;
+#[path = "suite/workflow_validation_test.rs"]
+mod workflow_validation_test;
+#[path = "suite/workflow_wire_test.rs"]
+mod workflow_wire_test;

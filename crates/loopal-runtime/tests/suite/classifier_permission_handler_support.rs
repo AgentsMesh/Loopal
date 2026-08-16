@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use loopal_error::LoopalError;
+use loopal_protocol::PermissionIntentRequest;
 use loopal_provider_api::{
     ChatParams, ChatStream, Provider, ProviderResolver, StopReason, StreamChunk, TaskType,
 };
@@ -83,17 +84,13 @@ pub struct RecordingHandler {
 
 #[async_trait]
 impl PermissionHandler for RecordingHandler {
-    async fn decide(
-        &self,
-        _id: &str,
-        _name: &str,
-        _input: &serde_json::Value,
-    ) -> PermissionOutcome {
+    async fn decide(&self, _request: &PermissionIntentRequest) -> PermissionOutcome {
         self.called.store(true, Ordering::SeqCst);
         PermissionOutcome {
             decision: self.decision,
             reason: "mock".into(),
             duration_ms: 0,
+            receipt: None,
         }
     }
 }

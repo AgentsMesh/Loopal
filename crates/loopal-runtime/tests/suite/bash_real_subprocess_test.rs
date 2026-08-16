@@ -64,7 +64,7 @@ async fn end_to_end_bash_env_injects_plaintext_and_redacts_output() {
     let seed = apply_resolver(
         "Bash",
         &mut input,
-        &["command", "env"],
+        &["env"],
         ctx.secret_client.as_ref(),
         &ctx.session_id,
     )
@@ -100,41 +100,25 @@ async fn end_to_end_bash_env_injects_plaintext_and_redacts_output() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn end_to_end_command_substitution_warns_but_still_works() {
+async fn end_to_end_bash_command_secret_ref_fails_before_resolution() {
     let mut map = HashMap::new();
     map.insert("canary".to_string(), CANARY.to_string());
     let store: Arc<dyn SecretClient> = Arc::new(MockStore(map));
-    let (backend, ctx) = build_ctx(store);
-
-    // LLM puts secret IN the command string (less safe, visible to `ps`).
-    let mut input = json!({
-        "command": "echo plaintext=<secret_ref:canary>"
-    });
-    let seed = apply_resolver(
+    let (_backend, ctx) = build_ctx(store);
+    let kernel = loopal_kernel::Kernel::new(loopal_config::Settings::default()).unwrap();
+    let preparation = loopal_runtime::tool_prepare::prepare_tool_action(
+        &kernel,
+        "command-secret",
         "Bash",
-        &mut input,
-        &["command", "env"],
-        ctx.secret_client.as_ref(),
-        &ctx.session_id,
+        json!({"command": "echo plaintext=<secret_ref:canary>"}),
     )
-    .await;
-    assert_eq!(seed.len(), 1);
+    .await
+    .unwrap();
 
-    let cmd = input["command"].as_str().unwrap();
-    assert!(cmd.contains(CANARY), "resolver substituted into command");
-
-    let result = backend
-        .exec(
-            cmd,
-            std::time::Duration::from_secs(5),
-            &EnvOverride::default(),
-        )
-        .await
-        .expect("subprocess");
-    assert!(result.stdout.contains(CANARY));
-
-    // Redactor still cleans output regardless of injection style.
-    let redacted = apply_redactor("Bash", result.stdout, &seed, "bash-e2e");
-    assert!(!redacted.contains(CANARY));
-    assert!(redacted.contains("<secret_ref:canary>"));
+    let error = match preparation.into_prepared() {
+        Ok(_) => panic!("command secret refs must be denied before resolution"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("non-secret-eligible"));
+    assert!(ctx.secret_client.is_some());
 }

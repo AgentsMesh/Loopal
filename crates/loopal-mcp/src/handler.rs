@@ -131,3 +131,33 @@ impl ClientHandler for LoopalClientHandler {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LoopalClientHandler, SamplingCallback};
+    use rmcp::handler::client::ClientHandler;
+
+    struct FixtureSampling;
+
+    #[async_trait::async_trait]
+    impl SamplingCallback for FixtureSampling {
+        async fn create_message(
+            &self,
+            _: Option<&str>,
+            _: Vec<(String, String)>,
+            _: Option<u32>,
+        ) -> Result<(String, String), String> {
+            Ok(("fixture-model".into(), "fixture-response".into()))
+        }
+    }
+
+    #[test]
+    fn advertises_sampling_only_when_a_callback_is_installed() {
+        let without_callback = LoopalClientHandler::new(None).get_info();
+        assert!(without_callback.capabilities.sampling.is_none());
+
+        let with_callback =
+            LoopalClientHandler::new(Some(std::sync::Arc::new(FixtureSampling))).get_info();
+        assert!(with_callback.capabilities.sampling.is_some());
+    }
+}

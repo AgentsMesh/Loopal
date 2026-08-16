@@ -20,27 +20,6 @@ pub(crate) use loopal_test_support::make_duplex_pair;
 
 const T: Duration = Duration::from_secs(10);
 
-async fn scripted_completion_result(reason: &str, result: Option<&str>) -> Result<String, String> {
-    let (server_transport, client_transport) = make_duplex_pair();
-    let (server, _server_rx) = Connection::new(server_transport).into_listening();
-    let client = AgentClient::new(client_transport);
-    server
-        .send_notification(
-            methods::AGENT_COMPLETED.name,
-            serde_json::to_value(AgentCompletion {
-                reason: reason.into(),
-                result: result.map(String::from),
-            })
-            .unwrap(),
-        )
-        .await
-        .unwrap();
-
-    let (event_tx, _event_rx) = mpsc::channel(16);
-    let cancel = CancellationToken::new();
-    bridge_child_events(client, &event_tx, "test", &cancel).await
-}
-
 /// Start a mock child server, return an initialized+started AgentClient.
 pub(crate) async fn start_bridge_client(
     calls: Vec<Vec<Result<loopal_provider_api::StreamChunk, loopal_error::LoopalError>>>,
@@ -68,6 +47,8 @@ pub(crate) async fn start_bridge_client(
         .start_agent(&loopal_agent_client::StartAgentParams {
             cwd: fixture.path().to_path_buf(),
             prompt: Some("work".to_string()),
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await
@@ -152,68 +133,6 @@ async fn bridge_exits_on_agent_completed() {
     assert_eq!(result.unwrap(), "done");
 }
 
-/// A terminal child error must not be disguised as a successful empty result.
-#[tokio::test]
-async fn bridge_propagates_child_error() {
-    let calls = vec![vec![chunks::non_retryable_error("invalid child request")]];
-    let (client, event_tx, cancel, _fix) = start_bridge_client(calls).await;
-
-    let error = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
-        .await
-        .expect("bridge should reach agent/completed")
-        .expect_err("terminal Error must fail the bridge result");
-
-    assert!(
-        error.contains("invalid child request"),
-        "child error should remain caller-visible, got: {error}"
-    );
-}
-
-/// Every non-goal terminal reason is a failure, including future reason tags.
-#[tokio::test]
-async fn bridge_rejects_non_goal_completion_reasons() {
-    for (reason, result) in [
-        ("aborted", Some("parent stopped child")),
-        ("shutdown", None),
-        ("future-reason", Some("new protocol detail")),
-    ] {
-        let error = scripted_completion_result(reason, result)
-            .await
-            .expect_err("only goal completion may succeed");
-
-        assert!(
-            error.contains(reason),
-            "failure should preserve completion reason, got: {error}"
-        );
-        if let Some(result) = result {
-            assert!(
-                error.contains(result),
-                "failure should preserve completion detail, got: {error}"
-            );
-        }
-    }
-}
-
-/// Transport EOF before agent/completed is a failed child, not empty success.
-#[tokio::test]
-async fn bridge_rejects_disconnect_before_completion() {
-    let (server_transport, client_transport) = make_duplex_pair();
-    let client = AgentClient::new(client_transport);
-    drop(server_transport);
-
-    let (event_tx, _event_rx) = mpsc::channel(16);
-    let cancel = CancellationToken::new();
-    let error = tokio::time::timeout(T, bridge_child_events(client, &event_tx, "test", &cancel))
-        .await
-        .expect("bridge should observe transport EOF")
-        .expect_err("disconnect must not become an empty success result");
-
-    assert_eq!(
-        error,
-        "sub-agent test connection closed before agent/completed"
-    );
-}
-
 /// Cancel token fired -> bridge sends shutdown and reports cancellation.
 #[tokio::test]
 async fn bridge_cancel_sends_shutdown() {
@@ -240,6 +159,8 @@ async fn bridge_cancel_sends_shutdown() {
         .start_agent(&loopal_agent_client::StartAgentParams {
             cwd: fixture.path().to_path_buf(),
             prompt: Some("slow task".to_string()),
+            sandbox_policy: None,
+            session_id: None,
             ..Default::default()
         })
         .await

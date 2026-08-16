@@ -22,12 +22,23 @@ pub struct AgentProcess {
     _stderr_drain: Option<tokio::task::JoinHandle<()>>,
 }
 
+impl Drop for AgentProcess {
+    fn drop(&mut self) {
+        // Prevent a child from surviving an aborted startup future.
+        if let Err(error) = self.child.start_kill()
+            && error.kind() != std::io::ErrorKind::InvalidInput
+        {
+            tracing::debug!(%error, "agent child cleanup on drop failed");
+        }
+    }
+}
+
 impl AgentProcess {
     /// Spawn an agent worker process with additional environment variables.
     ///
     /// The child's stdin/stdout are captured for IPC. Stderr is piped and
     /// drained to tracing to avoid corrupting the parent TUI terminal.
-    pub async fn spawn_with_env(
+    pub fn spawn_with_env_now(
         executable: Option<&str>,
         env_vars: &[(&str, &str)],
     ) -> anyhow::Result<Self> {
@@ -65,9 +76,20 @@ impl AgentProcess {
         })
     }
 
+    pub async fn spawn_with_env(
+        executable: Option<&str>,
+        env_vars: &[(&str, &str)],
+    ) -> anyhow::Result<Self> {
+        Self::spawn_with_env_now(executable, env_vars)
+    }
+
+    pub fn spawn_now(executable: Option<&str>) -> anyhow::Result<Self> {
+        Self::spawn_with_env_now(executable, &[])
+    }
+
     /// Spawn an agent worker process.
     pub async fn spawn(executable: Option<&str>) -> anyhow::Result<Self> {
-        Self::spawn_with_env(executable, &[]).await
+        Self::spawn_now(executable)
     }
 
     /// Get the transport for creating an IPC `Connection`.
@@ -123,44 +145,59 @@ impl AgentProcess {
         // so we must close via the transport rather than dropping child.stdin.
         self.transport.close().await;
 
-        // Wait with timeout for graceful exit
         match tokio::time::timeout(SHUTDOWN_GRACE, self.child.wait()).await {
             Ok(Ok(status)) => {
                 info!(?status, "agent process exited gracefully");
             }
             Ok(Err(e)) => {
-                warn!("error waiting for agent process: {e}");
+                return Err(anyhow::anyhow!("failed waiting for agent process: {e}"));
             }
             Err(_) => {
                 warn!("agent process did not exit within grace period, killing");
-                if let Err(e) = self.child.kill().await {
-                    warn!("failed to kill agent process: {e}");
-                }
-                let _ = self.child.wait().await;
+                self.child
+                    .kill()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to kill agent process: {e}"))?;
+                self.child
+                    .wait()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed waiting after agent kill: {e}"))?;
             }
         }
         Ok(())
     }
 
     fn resolve_executable(name: &str) -> anyhow::Result<PathBuf> {
-        // Check LOOPAL_BINARY env var first (set by Bazel or test harness).
-        if let Ok(path) = std::env::var("LOOPAL_BINARY") {
-            let p = PathBuf::from(&path);
-            if p.exists() {
-                return Ok(p);
-            }
+        let override_path = std::env::var("LOOPAL_BINARY").ok().map(PathBuf::from);
+        let current = std::env::current_exe().ok();
+        let selected = Self::select_executable(name, override_path, current);
+        if selected.exists() {
+            return std::fs::canonicalize(&selected).map_err(|error| {
+                anyhow::anyhow!(
+                    "failed to resolve agent executable '{}': {error}",
+                    selected.display()
+                )
+            });
         }
-        // If an explicit path is provided and exists, use it directly.
+        Ok(selected)
+    }
+
+    fn select_executable(
+        name: &str,
+        override_path: Option<PathBuf>,
+        current: Option<PathBuf>,
+    ) -> PathBuf {
+        if let Some(path) = override_path.filter(|path| path.exists()) {
+            return path;
+        }
         let explicit = PathBuf::from(name);
         if explicit.is_absolute() && explicit.exists() {
-            return Ok(explicit);
+            return explicit;
         }
-        // Otherwise, use the current executable (same binary, worker mode).
-        if let Ok(current) = std::env::current_exe()
-            && current.exists()
-        {
-            return Ok(current);
-        }
-        Ok(explicit)
+        current.filter(|path| path.exists()).unwrap_or(explicit)
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "process/tests.rs"]
+mod tests;

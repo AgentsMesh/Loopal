@@ -1,12 +1,12 @@
 use chrono::{Duration, Utc};
 use loopal_protocol::AgentEventPayload;
-use loopal_provider_api::ContentBlock;
 use loopal_tool_idle::{MAX_IDLE_DURATION_SECS, MIN_IDLE_DURATION_SECS, NAME, validate_duration};
 use serde::Deserialize;
 use tracing::debug;
 
 use super::continuation_gate::GateClose;
 use super::runner::AgentLoopRunner;
+use super::tool_result_sink::PendingToolResult;
 use super::turn_context::TurnContext;
 
 #[derive(Deserialize)]
@@ -25,7 +25,7 @@ impl AgentLoopRunner {
         idx: usize,
         id: &str,
         input: &serde_json::Value,
-    ) -> loopal_error::Result<(usize, ContentBlock)> {
+    ) -> loopal_error::Result<(usize, PendingToolResult)> {
         debug!(tool = NAME, "intercepted");
         let parsed: ParsedIdle = match serde_json::from_value(input.clone()) {
             Ok(p) => p,
@@ -35,11 +35,17 @@ impl AgentLoopRunner {
                      max_idle_duration_secs (u64, {MIN_IDLE_DURATION_SECS}..={MAX_IDLE_DURATION_SECS}), \
                      reason (string). Optional: expected_wake_signal (string)."
                 );
-                return Ok((idx, self.emit_and_block(id, NAME, msg, true, None).await?));
+                return Ok((
+                    idx,
+                    self.pending_tool_result(id, NAME, msg, true, None).await?,
+                ));
             }
         };
         if let Err(msg) = validate_duration(parsed.max_idle_duration_secs) {
-            return Ok((idx, self.emit_and_block(id, NAME, msg, true, None).await?));
+            return Ok((
+                idx,
+                self.pending_tool_result(id, NAME, msg, true, None).await?,
+            ));
         }
         let wake_at = Utc::now() + Duration::seconds(parsed.max_idle_duration_secs as i64);
         self.continuation_gate
@@ -65,7 +71,8 @@ impl AgentLoopRunner {
         );
         Ok((
             idx,
-            self.emit_and_block(id, NAME, message, false, None).await?,
+            self.pending_tool_result(id, NAME, message, false, None)
+                .await?,
         ))
     }
 }

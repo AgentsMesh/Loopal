@@ -20,6 +20,52 @@ struct LaggedResyncFailureTransport {
     release_first_event: Notify,
 }
 
+struct ForwardingTransport {
+    fail_send: bool,
+    closed: AtomicBool,
+    frames: std::sync::Mutex<Vec<serde_json::Value>>,
+}
+
+impl ForwardingTransport {
+    fn new(fail_send: bool) -> Arc<Self> {
+        Arc::new(Self {
+            fail_send,
+            closed: AtomicBool::new(false),
+            frames: std::sync::Mutex::new(Vec::new()),
+        })
+    }
+
+    fn frames(&self) -> Vec<serde_json::Value> {
+        self.frames.lock().unwrap().clone()
+    }
+}
+
+#[async_trait]
+impl Transport for ForwardingTransport {
+    async fn send(&self, data: &[u8]) -> Result<(), loopal_error::LoopalError> {
+        let value = serde_json::from_slice(data)
+            .map_err(|error| loopal_error::LoopalError::Other(error.to_string()))?;
+        self.frames.lock().unwrap().push(value);
+        if self.fail_send {
+            Err(loopal_error::LoopalError::Other("forward failed".into()))
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn recv(&self) -> Result<Option<Vec<u8>>, loopal_error::LoopalError> {
+        pending().await
+    }
+
+    fn is_connected(&self) -> bool {
+        !self.closed.load(Ordering::Acquire)
+    }
+
+    async fn close(&self) {
+        self.closed.store(true, Ordering::Release);
+    }
+}
+
 #[async_trait]
 impl Transport for LaggedResyncFailureTransport {
     async fn send(&self, data: &[u8]) -> Result<(), loopal_error::LoopalError> {
@@ -54,6 +100,8 @@ impl Transport for LaggedResyncFailureTransport {
     }
 }
 
+#[path = "tcp_ui_io_tests/forward.rs"]
+mod forward;
 #[path = "tcp_ui_io_tests/lease_cleanup.rs"]
 mod lease_cleanup;
 #[path = "tcp_ui_io_tests/resync.rs"]

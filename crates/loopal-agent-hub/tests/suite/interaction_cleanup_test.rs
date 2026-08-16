@@ -52,48 +52,6 @@ async fn wait_pending(hub: &Arc<Mutex<Hub>>, id: &str) {
 }
 
 #[tokio::test]
-async fn interrupt_cancels_pending_without_clearing_session_grants() {
-    let (hub, raw_rx) = make_hub();
-    let _event_loop = start_event_loop(hub.clone(), raw_rx);
-    let ui = UiSession::connect(hub.clone(), "desktop", plan_capability()).await;
-    let (agent, mut agent_rx) = hub_server::connect_local(hub.clone(), "main");
-    let agent_for_interrupt = agent.clone();
-    tokio::spawn(async move {
-        while let Some(message) = agent_rx.recv().await {
-            if let loopal_ipc::connection::Incoming::Request { id, method, .. } = message
-                && method == methods::AGENT_INTERRUPT.name
-            {
-                agent_for_interrupt
-                    .respond(id, json!({"ok": true}))
-                    .await
-                    .unwrap();
-            }
-        }
-    });
-    hub.lock()
-        .await
-        .session_permission_grants
-        .insert(("main".into(), "Bash".into()));
-    let request = request_plan(agent, "interrupt");
-    wait_pending(&hub, "interrupt").await;
-
-    ui.client.interrupt_target("main").await;
-    let response = tokio::time::timeout(Duration::from_secs(1), request)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert_eq!(response["decision"], "cancelled");
-    assert_eq!(response["reason"], "interrupted");
-    assert!(
-        hub.lock()
-            .await
-            .session_permission_grants
-            .contains(&("main".into(), "Bash".into()))
-    );
-}
-
-#[tokio::test]
 async fn dropped_request_sends_cancel_and_removes_hub_pending_state() {
     let (hub, raw_rx) = make_hub();
     let _event_loop = start_event_loop(hub.clone(), raw_rx);

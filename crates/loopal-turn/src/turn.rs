@@ -132,6 +132,15 @@ pub enum TurnTrigger {
         hook_kind: String,
         content: String,
     },
+    WorkflowResult {
+        session_id: String,
+        run_id: String,
+        terminal_revision: u64,
+        #[serde(default)]
+        payload_digest: String,
+        state: String,
+        content: String,
+    },
     /// Synthetic trigger when resuming a session from disk — no real envelope.
     Resume,
 }

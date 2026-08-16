@@ -13,8 +13,10 @@ mod test_helpers;
 
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use loopal_protocol::AgentEvent;
-use loopal_view_state::{AgentConversation, SessionViewState, ViewSnapshot, ViewStateReducer};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ROOT_AGENT_NAME};
+use loopal_view_state::{
+    AgentConversation, SessionViewState, ViewSnapshot, ViewStateApplyOutcome, ViewStateReducer,
+};
 
 #[derive(Clone)]
 pub struct ViewClient {
@@ -27,7 +29,7 @@ impl ViewClient {
     pub fn from_snapshot(agent: impl Into<String>, snapshot: ViewSnapshot) -> Self {
         let agent = agent.into();
         let mut reducer = ViewStateReducer::new(&agent);
-        reducer.reset_to(snapshot);
+        reducer.reset_to(snapshot_for_agent(&agent, snapshot));
         Self {
             agent,
             inner: Arc::new(RwLock::new(reducer)),
@@ -61,24 +63,29 @@ impl ViewClient {
         ViewClientStateGuard { guard }
     }
 
-    pub fn apply_event(&self, event: &AgentEvent) {
+    pub fn apply_event(&self, event: &AgentEvent) -> ViewStateApplyOutcome {
+        if matches!(&event.payload, AgentEventPayload::WorkflowRunChanged(_)) {
+            let local_root = event
+                .agent_name
+                .as_ref()
+                .is_none_or(|address| address.is_local() && address.agent == ROOT_AGENT_NAME);
+            if self.agent != ROOT_AGENT_NAME || !local_root {
+                return ViewStateApplyOutcome::NoOp;
+            }
+        }
         let event_agent = event.agent_name.as_ref().map(|q| q.agent.as_str());
         let matches = match event_agent {
             Some(name) => name == self.agent,
             None => self.agent == "main",
         };
         if !matches {
-            return;
+            return ViewStateApplyOutcome::NoOp;
         }
         let mut reducer = self.inner.write().expect("view client lock poisoned");
         match event.rev {
-            Some(rev) if rev <= reducer.rev() => {}
-            Some(rev) => {
-                reducer.apply_with_rev(event.payload.clone(), rev);
-            }
-            None => {
-                reducer.apply(event.payload.clone());
-            }
+            Some(rev) if rev <= reducer.rev() => ViewStateApplyOutcome::NoOp,
+            Some(rev) => reducer.apply_with_rev_checked(event.payload.clone(), rev),
+            None => reducer.apply_checked(event.payload.clone()),
         }
     }
 
@@ -97,7 +104,7 @@ impl ViewClient {
             .filter(|(_, m)| m.ui_local)
             .map(|(i, m)| (i, m.clone()))
             .collect();
-        reducer.reset_to(snapshot);
+        reducer.reset_to(snapshot_for_agent(&self.agent, snapshot));
         reducer.with_conversation_mut(|conv| {
             for (idx, msg) in preserved {
                 let pos = idx.min(conv.messages.len());
@@ -119,6 +126,13 @@ impl ViewClient {
         let mut reducer = self.inner.write().expect("view client lock poisoned");
         reducer.with_view_mut(f)
     }
+}
+
+fn snapshot_for_agent(agent: &str, mut snapshot: ViewSnapshot) -> ViewSnapshot {
+    if agent != ROOT_AGENT_NAME {
+        snapshot.state.workflows = Default::default();
+    }
+    snapshot
 }
 
 /// Read guard over the local `SessionViewState`. Holding this prevents

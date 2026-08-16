@@ -35,7 +35,11 @@ pub(crate) struct AgentLoopAssembly {
     pub outstanding_tasks: Option<Arc<dyn OutstandingTasksDigest>>,
     pub goal_session: Option<Arc<GoalRuntimeSession>>,
     pub scheduler: Arc<loopal_scheduler::CronScheduler>,
+    pub workflow_permission_causation: Option<loopal_protocol::WorkflowPermissionCausation>,
     pub decision_cell: loopal_runtime::frontend::DecisionCell,
+    pub workflow_input_handler:
+        Option<Arc<dyn loopal_runtime::workflow_input::WorkflowInputHandler>>,
+    pub workflow_lease_tracker: Arc<loopal_runtime::WorkflowLeaseTracker>,
 }
 
 pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParams {
@@ -58,7 +62,13 @@ pub(crate) fn assemble_agent_loop_params(a: AgentLoopAssembly) -> AgentLoopParam
     .resume_hooks(a.resume_hooks)
     .memory_channel_opt(a.memory_channel)
     .scheduler(a.scheduler)
-    .decision_cell(a.decision_cell);
+    .workflow_permission_causation_opt(a.workflow_permission_causation)
+    .decision_cell(a.decision_cell)
+    .workflow_lease_tracker(a.workflow_lease_tracker);
+    let builder = match a.workflow_input_handler {
+        Some(handler) => builder.workflow_input_handler(handler),
+        None => builder,
+    };
     let builder = match a.one_shot_chat {
         Some(s) => builder.one_shot_chat(s),
         None => builder,

@@ -9,12 +9,38 @@ const RESPONSE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5)
 const RESPONSE_DEADLINE: std::time::Duration = std::time::Duration::from_millis(50);
 
 impl HubClient {
-    pub async fn respond_permission(&self, agent_name: &str, interaction_id: &str, allow: bool) {
+    pub async fn respond_permission(
+        &self,
+        agent_name: &str,
+        interaction_id: &str,
+        intent_digest: Option<loopal_protocol::PermissionIntentDigest>,
+        allow: bool,
+    ) {
+        self.respond_permission_with_memory(
+            agent_name,
+            interaction_id,
+            intent_digest,
+            allow,
+            false,
+        )
+        .await;
+    }
+
+    pub async fn respond_permission_with_memory(
+        &self,
+        agent_name: &str,
+        interaction_id: &str,
+        intent_digest: Option<loopal_protocol::PermissionIntentDigest>,
+        allow: bool,
+        remember_session: bool,
+    ) {
         let params = serde_json::json!({
             "agent_name": agent_name,
             // Wire key retained for compatibility; value is the opaque Hub token.
             "tool_call_id": interaction_id,
+            "permission_intent_digest": intent_digest,
             "allow": allow,
+            "remember_session": allow && remember_session,
         });
         if let Err(e) = self
             .send_interaction_response(methods::HUB_PERMISSION_RESPONSE.name, params)

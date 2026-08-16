@@ -9,6 +9,7 @@
 pub mod agent_io;
 pub mod agent_registry;
 mod authoritative_events;
+mod completion_guard;
 pub mod dispatch;
 mod event_router;
 pub mod finish;
@@ -18,15 +19,23 @@ mod hub_ui_client;
 mod hub_ui_client_responses;
 pub mod mcp_service;
 pub mod pending_relay;
+mod permission_grants;
+mod permission_receipts;
 mod remote_relay;
+mod request_principal;
 mod routing;
 pub mod spawn_manager;
 pub mod spawn_registry;
+#[cfg(test)]
+mod spawn_registry_tests;
 mod tcp_ui_io;
 pub mod topology;
 mod types;
 mod ui_dispatcher;
+#[cfg(test)]
+mod ui_dispatcher_tests;
 mod ui_request_loop;
+mod ui_request_policy;
 pub mod ui_session;
 mod ui_startup_gate;
 pub mod uplink;
@@ -34,6 +43,7 @@ pub mod uplink_connection;
 mod uplink_requests;
 mod uplink_tasks;
 pub mod view_router;
+pub mod workflow;
 
 pub use agent_registry::AgentRegistry;
 pub use event_router::start_event_loop;

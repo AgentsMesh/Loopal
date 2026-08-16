@@ -1,4 +1,6 @@
 use loopal_protocol::{ControlCommand, Envelope};
+
+use super::permission_request_support::permission_request;
 use loopal_runtime::frontend::AgentFrontend;
 use loopal_runtime::frontend::{DenyAllHandler, UnifiedFrontend, UnsupportedQuestionHandler};
 use loopal_tool_api::PermissionDecision;
@@ -35,8 +37,7 @@ async fn test_unified_permission_auto_deny() {
         ctrl_rx,
         Box::new(DenyAllHandler),
     );
-    let d = f
-        .request_permission("id1", "Bash", &serde_json::json!({}))
-        .await;
+    let request = permission_request("id1", "Bash", serde_json::json!({}));
+    let d = f.request_permission(&request).await;
     assert_eq!(d, PermissionDecision::Deny);
 }

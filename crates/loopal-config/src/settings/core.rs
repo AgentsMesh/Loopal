@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::mcp::McpServerConfig;
 use super::memory::MemoryConfig;
 use super::providers::ProvidersConfig;
+use super::workflow::WorkflowSettings;
 use crate::fetch_refiner::FetchRefinerConfig;
 use crate::harness::HarnessConfig;
 use crate::hook::HookConfig;
@@ -77,6 +78,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub bg_tasks: BgTaskConfig,
+
+    #[serde(default)]
+    pub workflow: WorkflowSettings,
 }
 
 impl Default for Settings {
@@ -102,6 +106,7 @@ impl Default for Settings {
             compaction: CompactionSettings::default(),
             images: ImageSettings::default(),
             bg_tasks: BgTaskConfig::default(),
+            workflow: WorkflowSettings::default(),
         }
     }
 }

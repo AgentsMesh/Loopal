@@ -4,14 +4,14 @@ rust_library(
     name = "loopal-vault-api",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = [
+        "@crates//:async-trait",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "@crates//:secrecy",
         "@crates//:serde",
         "@crates//:thiserror",
-    ],
-    proc_macro_deps = [
-        "@crates//:async-trait",
     ],
 )
 
@@ -19,4 +19,5 @@ rust_test(
     name = "loopal-vault-api-unit-test",
     crate = ":loopal-vault-api",
     edition = "2024",
+    deps = ["@crates//:serde_json"],
 )

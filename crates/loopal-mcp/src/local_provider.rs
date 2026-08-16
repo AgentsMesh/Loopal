@@ -83,17 +83,8 @@ impl LocalMcpProvider {
         self.signal.wait_forever().await;
     }
 
-    pub async fn try_reconnect(&self, server: &str) -> bool {
-        let mut mgr = self.manager.write().await;
-        if mgr.disconnect_connection(server).await.is_err() {
-            tracing::warn!(server, "MCP disconnect before reconnect failed");
-            return false;
-        }
-        if mgr.restart_connection(server).await.is_err() {
-            tracing::warn!(server, "MCP restart_connection failed");
-            return false;
-        }
-        true
+    pub async fn owns_server(&self, server: &str) -> bool {
+        self.manager.read().await.connections.contains_key(server)
     }
 
     // O(1) check whether `server` has settled tools — equivalent to
@@ -114,6 +105,17 @@ impl LocalMcpProvider {
 impl McpProvider for LocalMcpProvider {
     async fn list_tools(&self, _budget: loopal_ipc::IpcBudget) -> Vec<(String, ToolDefinition)> {
         self.manager.read().await.get_tools_with_server()
+    }
+
+    async fn reconnect(
+        &self,
+        server: &str,
+        _budget: loopal_ipc::IpcBudget,
+    ) -> Result<(), McpError> {
+        self.try_reconnect(server)
+            .await
+            .then_some(())
+            .ok_or_else(|| McpError::ConnectionFailed("MCP reconnect failed".into()))
     }
 
     async fn call_tool(
@@ -156,3 +158,10 @@ impl McpProvider for LocalMcpProvider {
         self.manager.read().await.collect_snapshots()
     }
 }
+
+#[path = "local_provider_reconnect.rs"]
+mod reconnect;
+
+#[cfg(test)]
+#[path = "local_provider_tests.rs"]
+mod tests;

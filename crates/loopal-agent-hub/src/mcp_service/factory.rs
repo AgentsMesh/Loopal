@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use loopal_config::{McpServerConfig, McpSharing};
+use loopal_output_guard::FinalSinkRedactionSeed;
 
 pub(super) fn load_servers_by_sharing(
     cwd: &Path,
@@ -22,14 +23,37 @@ pub(super) fn load_servers_by_sharing(
         .collect()
 }
 
+#[cfg(test)]
 pub(super) async fn build_local_provider(
-    secret_client: Option<&Arc<dyn loopal_secret_client::SecretClient>>,
+    vault_service: Option<&Arc<loopal_hub_vault::HubVaultService>>,
     cwd: &Path,
     servers: indexmap::IndexMap<String, McpServerConfig>,
 ) -> loopal_mcp::LocalMcpProvider {
+    build_local_provider_with_redaction_seed(
+        vault_service,
+        cwd,
+        servers,
+        FinalSinkRedactionSeed::new(),
+    )
+    .await
+}
+
+pub(super) async fn build_local_provider_with_redaction_seed(
+    vault_service: Option<&Arc<loopal_hub_vault::HubVaultService>>,
+    cwd: &Path,
+    servers: indexmap::IndexMap<String, McpServerConfig>,
+    redaction_seed: FinalSinkRedactionSeed,
+) -> loopal_mcp::LocalMcpProvider {
     let manager = Arc::new(tokio::sync::RwLock::new(loopal_mcp::McpManager::new()));
-    if let Some(c) = secret_client {
-        manager.write().await.set_secret_client(c.clone());
+    if let Some(vault) = vault_service {
+        let client: Arc<dyn loopal_secret_client::SecretClient> = Arc::new(
+            super::vault_resolver::HubMcpSecretClient::new_with_redaction_seed(
+                vault.clone(),
+                cwd.to_path_buf(),
+                redaction_seed,
+            ),
+        );
+        manager.write().await.set_secret_client(client);
     }
     let local = loopal_mcp::LocalMcpProvider::new(manager);
     if servers.is_empty() {

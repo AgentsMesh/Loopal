@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use loopal_protocol::{AgentEvent, AgentEventPayload, Question, UserQuestionResponse};
+use loopal_protocol::{
+    AgentEvent, AgentEventPayload, PermissionIntentRequest, Question, UserQuestionResponse,
+};
 use loopal_provider_api::ContentBlock;
 use loopal_runtime::agent_input::AgentInput;
 use loopal_runtime::agent_loop::{PlanModeState, StreamingToolHandle};
@@ -41,13 +43,8 @@ impl AgentFrontend for PlanFrontend {
         self.inner.try_recv_input().await
     }
 
-    async fn request_permission(
-        &self,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
-    ) -> PermissionDecision {
-        self.inner.request_permission(id, name, input).await
+    async fn request_permission(&self, request: &PermissionIntentRequest) -> PermissionDecision {
+        self.inner.request_permission(request).await
     }
 
     fn event_emitter(&self) -> Box<dyn EventEmitter> {

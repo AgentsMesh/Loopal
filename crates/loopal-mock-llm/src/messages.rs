@@ -47,17 +47,21 @@ pub(crate) async fn handle_completion(
         .await;
     let Some(call) = call else {
         record.matched = false;
+        let details = record.match_errors.clone();
         state.record(record).await;
         return write_json(
             stream,
             409,
-            &json!({"error": "scenario has no matching response"}),
+            &json!({"error": "scenario has no matching response", "details": details}),
             &BTreeMap::new(),
         )
         .await;
     };
     let errors = validate_request(&call.expected, &body, &record);
     record.matched = errors.is_empty();
+    if !errors.is_empty() {
+        record.match_errors = errors.clone();
+    }
     state.record(record).await;
     if !errors.is_empty() {
         return write_json(

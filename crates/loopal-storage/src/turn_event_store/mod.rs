@@ -34,6 +34,23 @@ impl TurnEventStore {
     }
 
     pub fn append_event(&self, session_id: &str, event: &TurnEvent) -> Result<(), StorageError> {
+        self.append_event_with_durability(session_id, event, false)
+    }
+
+    pub fn append_event_durable(
+        &self,
+        session_id: &str,
+        event: &TurnEvent,
+    ) -> Result<(), StorageError> {
+        self.append_event_with_durability(session_id, event, true)
+    }
+
+    fn append_event_with_durability(
+        &self,
+        session_id: &str,
+        event: &TurnEvent,
+        durable: bool,
+    ) -> Result<(), StorageError> {
         let line =
             serde_json::to_string(event).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let path = self.turns_file(session_id);
@@ -45,6 +62,10 @@ impl TurnEventStore {
             .append(true)
             .open(&path)?;
         writeln!(file, "{line}")?;
+        if durable {
+            file.flush()?;
+            file.sync_data()?;
+        }
         Ok(())
     }
 
@@ -53,7 +74,7 @@ impl TurnEventStore {
         if !path.exists() {
             return Ok(Vec::new());
         }
-        let contents = std::fs::read_to_string(&path)?;
+        let contents = read_repairing_torn_tail(&path)?;
         let mut events = Vec::new();
         for line in contents.lines() {
             if line.trim().is_empty() {
@@ -66,10 +87,33 @@ impl TurnEventStore {
         Ok(events)
     }
 
+    pub fn sync_events(&self, session_id: &str) -> Result<(), StorageError> {
+        let path = self.turns_file(session_id);
+        let file = std::fs::OpenOptions::new().append(true).open(path)?;
+        file.sync_data()?;
+        Ok(())
+    }
+
     pub fn load_turns(&self, session_id: &str) -> Result<Vec<Turn>, StorageError> {
         let events = self.load_events(session_id)?;
         Ok(fold_events(events))
     }
+}
+
+fn read_repairing_torn_tail(path: &std::path::Path) -> Result<String, StorageError> {
+    let mut bytes = std::fs::read(path)?;
+    if !bytes.is_empty() && bytes.last() != Some(&b'\n') {
+        let complete_len = bytes
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .map_or(0, |index| index + 1);
+        let file = std::fs::OpenOptions::new().write(true).open(path)?;
+        file.set_len(complete_len as u64)?;
+        file.sync_data()?;
+        bytes.truncate(complete_len);
+        tracing_warn("discarded an incomplete final turn-event record");
+    }
+    String::from_utf8(bytes).map_err(|error| StorageError::Serialization(error.to_string()))
 }
 
 fn tracing_warn(msg: &str) {

@@ -6,14 +6,20 @@ rust_library(
     edition = "2024",
     visibility = ["//visibility:public"],
     deps = [
-        "//crates/loopal-backend:loopal-backend",
-        "//crates/loopal-error:loopal-error",
-        "//crates/loopal-protocol:loopal-protocol",
-        "//crates/loopal-tool-api:loopal-tool-api",
+        "//crates/loopal-backend",
+        "//crates/loopal-error",
+        "//crates/loopal-protocol",
+        "//crates/loopal-tool-api",
         "@crates//:parking_lot",
         "@crates//:tokio",
         "@crates//:tracing",
     ],
+)
+
+rust_test(
+    name = "loopal-tool-background-unit-test",
+    crate = ":loopal-tool-background",
+    edition = "2024",
 )
 
 rust_test(
@@ -23,14 +29,17 @@ rust_test(
     edition = "2024",
     deps = [
         ":loopal-tool-background",
-        "//crates/loopal-backend:loopal-backend",
-        "//crates/loopal-protocol:loopal-protocol",
+        "//crates/loopal-backend",
+        "//crates/loopal-protocol",
+        "//crates/loopal-tool-api",
         "//crates/tools/process/bash:loopal-tool-bash",
         "@crates//:parking_lot",
-        "@crates//:tempfile",
         "@crates//:serde_json",
+        "@crates//:tempfile",
         "@crates//:tokio",
         "@crates//:uuid",
-        "//crates/loopal-tool-api",
-    ],
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@crates//:libc"],
+    }),
 )

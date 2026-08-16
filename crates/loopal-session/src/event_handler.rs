@@ -14,7 +14,16 @@ use crate::state::{ROOT_AGENT, SessionState};
 pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
     match &event.payload {
         AgentEventPayload::SessionResumed { session_id, .. } => {
-            state.root_session_id = Some(session_id.clone());
+            // `SessionState` is the root-session projection. A child agent
+            // may also resume its own persisted session, but that event must
+            // never rebind the Hub/TUI root workflow owner.
+            let is_root = event
+                .agent_name
+                .as_ref()
+                .is_none_or(|address| address.is_local() && address.agent == ROOT_AGENT);
+            if is_root {
+                state.root_session_id = Some(session_id.clone());
+            }
         }
         AgentEventPayload::McpStatusReport { servers } => {
             state.mcp_status = Some(servers.clone());
@@ -81,6 +90,7 @@ pub fn apply_event(state: &mut SessionState, event: AgentEvent) {
         | AgentEventPayload::BgTaskCompleted { .. }
         | AgentEventPayload::TasksChanged { .. }
         | AgentEventPayload::CronsChanged { .. }
+        | AgentEventPayload::WorkflowRunChanged(_)
         | AgentEventPayload::ThreadGoalUpdated { .. }
         | AgentEventPayload::ClassifierProgress { .. }
         | AgentEventPayload::ClassifierFailed { .. }

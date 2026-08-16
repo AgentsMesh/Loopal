@@ -2,13 +2,26 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use loopal_ipc::Connection;
-use loopal_protocol::AgentEventPayload;
+use loopal_protocol::{AgentEventPayload, PermissionIntent, PermissionIntentRequest};
 use tokio::sync::{Mutex, mpsc};
 
 use super::{cancel_pending_request, cleanup_pending_for_uplink};
 use crate::pending_relay::types::InteractionAudience;
 use crate::pending_relay::{PendingPermissionInfo, PendingQuestionInfo, PendingRemoteQuestionInfo};
 use crate::{Hub, HubUplink};
+
+fn permission_intent() -> PermissionIntent {
+    let request = PermissionIntentRequest::create(
+        "reused",
+        "Bash",
+        serde_json::json!({}),
+        serde_json::json!({}),
+        serde_json::json!({"type": "object"}),
+        None,
+    )
+    .unwrap();
+    PermissionIntent::bind(request.intent_seed, 1, 1, "new-token").unwrap()
+}
 
 #[tokio::test]
 async fn stale_cancel_request_cannot_remove_reconnected_generation() {
@@ -21,12 +34,14 @@ async fn stale_cancel_request_cannot_remove_reconnected_generation() {
     hub.pending_permissions.insert(
         ("main".into(), "reused".into()),
         PendingPermissionInfo {
+            execution: crate::types::AgentExecutionRef::local("main", 1),
             agent_conn: new_conn.clone(),
             agent_ipc_id: 1,
             agent_name: "main".into(),
             interaction_id: "new-token".into(),
             logical_id: "reused".into(),
             tool_name: "Bash".into(),
+            permission_intent: permission_intent(),
         },
     );
     let hub = Arc::new(Mutex::new(hub));

@@ -88,13 +88,13 @@ async fn tracing_never_contains_plaintext_after_full_pipeline() {
     let ctx = ctx_with_secret("canary", SECRET_VALUE);
 
     let mut input = json!({
-        "command": "curl -H 'Bearer <secret_ref:canary>'",
+        "command": "curl -H \"Bearer $TOKEN\" example.com",
         "env": { "TOKEN": "<secret_ref:canary>" }
     });
     let seed = apply_resolver(
         "Bash",
         &mut input,
-        &["command", "env"],
+        &["env"],
         ctx.secret_client.as_ref(),
         &ctx.session_id,
     )

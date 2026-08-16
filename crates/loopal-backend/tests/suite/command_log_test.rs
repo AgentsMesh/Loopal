@@ -92,17 +92,39 @@ async fn exec_background_creates_log_path_in_spawned_data() {
     .await
     .unwrap();
     let SpawnedBackgroundData {
-        spawned,
+        mut spawned,
         log_path,
-        head_tail: _,
-        stderr_buf: _,
-        drainers: _,
+        capture_state: _,
+        capture_task,
     } = data;
     assert!(log_path.starts_with(std::env::temp_dir()));
     assert!(tokio::fs::metadata(&log_path).await.is_ok());
-    let mut child = spawned.child;
-    let _ = child.start_kill();
-    let _ = child.wait().await;
+    let config = loopal_tool_api::BgTaskConfig::default();
+    spawned.terminate(config.sigterm_grace()).await;
+    loopal_backend::process_capture_task::join_bounded(capture_task, config.drainers_grace())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn invalid_log_session_prevents_command_side_effect() {
+    let temp = tempfile::tempdir().unwrap();
+    let marker = temp.path().join("not-created");
+    let command = format!("printf side-effect > '{}'", marker.display());
+    let error = exec_command(
+        temp.path(),
+        None,
+        &command,
+        &EnvOverride::default(),
+        Duration::from_secs(5),
+        "..",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.to_string().contains("invalid session id"));
+    assert!(!marker.exists());
 }
 
 #[tokio::test]

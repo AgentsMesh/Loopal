@@ -1,15 +1,11 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
 
-use loopal_ipc::cross_hub::RemoteSpawnOutcome;
 use loopal_ipc::protocol::methods;
 
 use crate::meta_hub::MetaHub;
-
-const SPAWN_FORWARD_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Dispatch a single request from a Sub-Hub.
 pub async fn dispatch_meta_request(
@@ -20,7 +16,9 @@ pub async fn dispatch_meta_request(
 ) -> Result<Value, String> {
     match method {
         m if m == methods::META_ROUTE.name => handle_meta_route(meta_hub, params, &from_hub).await,
-        m if m == methods::META_SPAWN.name => handle_meta_spawn(meta_hub, params).await,
+        m if m == methods::META_SPAWN.name => {
+            crate::spawn::handle_meta_spawn(meta_hub, params, &from_hub).await
+        }
         m if m == methods::META_LIST_HUBS.name => handle_meta_list_hubs(meta_hub).await,
         m if m == methods::META_TOPOLOGY.name => handle_meta_topology(meta_hub).await,
         m if m == methods::META_REMOTE_RELAY.name => {
@@ -65,59 +63,6 @@ async fn handle_meta_route(
 
     router.route(&envelope, &refs).await?;
     Ok(json!({"ok": true}))
-}
-
-/// Delegate agent spawn to a specific Sub-Hub.
-///
-/// Cross-hub spawn cannot share filesystem state with the originating hub,
-/// so `cwd` / `fork_context` / `resume` are forbidden in the payload —
-/// receiver Hub uses its local `default_cwd`.
-async fn handle_meta_spawn(meta_hub: &Arc<Mutex<MetaHub>>, params: Value) -> Result<Value, String> {
-    let target_hub = params["target_hub"]
-        .as_str()
-        .ok_or("missing 'target_hub'")?
-        .to_string();
-
-    loopal_ipc::cross_hub::validate_spawn_payload(&params)?;
-
-    let conn = {
-        let mh = meta_hub.lock().await;
-        mh.registry
-            .connection(&target_hub)
-            .ok_or_else(|| format!("hub '{target_hub}' not connected"))?
-    };
-
-    // Forward as hub/spawn_remote_agent (strip target_hub field). The new
-    // method signals to the receiver that filesystem-coupled fields must be
-    // ignored / rejected; receiver uses its own default_cwd.
-    let mut spawn_params = params.clone();
-    if let Some(obj) = spawn_params.as_object_mut() {
-        obj.remove("target_hub");
-    }
-
-    let outcome = match tokio::time::timeout(
-        SPAWN_FORWARD_TIMEOUT,
-        conn.send_request(methods::HUB_SPAWN_REMOTE_AGENT.name, spawn_params),
-    )
-    .await
-    {
-        Ok(Ok(response)) => RemoteSpawnOutcome::Spawned { response },
-        Ok(Err(loopal_ipc::RpcError::Remote { message, .. })) => {
-            // The destination produced an application response. Its spawn
-            // coordinator rolls registration/process state back before
-            // returning an error, so this is the only definitive rejection.
-            RemoteSpawnOutcome::RejectedBeforeSideEffect {
-                message: format!("spawn on '{target_hub}' rejected: {message}"),
-            }
-        }
-        Ok(Err(error)) => RemoteSpawnOutcome::OutcomeUnknown {
-            message: format!("spawn on '{target_hub}' transport failed: {error}"),
-        },
-        Err(_) => RemoteSpawnOutcome::OutcomeUnknown {
-            message: format!("spawn on '{target_hub}' timed out"),
-        },
-    };
-    Ok(outcome.into_value())
 }
 
 /// List all connected Sub-Hubs.

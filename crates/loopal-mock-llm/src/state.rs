@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -65,7 +66,12 @@ impl ServerState {
             key_present,
             version_present,
         );
-        let call = scenario.take_matching(body, &record);
+        let (call, failures) = scenario.take_matching(body, &record);
+        let mut record = record;
+        record.call_label = call.as_ref().and_then(|call| call.label.clone());
+        if call.is_none() {
+            record.match_errors = failures;
+        }
         (record, call)
     }
 
@@ -82,6 +88,10 @@ impl ServerState {
 
     pub async fn requests(&self) -> Vec<RequestRecord> {
         self.requests.lock().await.clone()
+    }
+
+    pub async fn append_calls(&self, calls: Vec<Value>) -> Result<(usize, usize)> {
+        self.scenario.lock().await.append_calls(calls)
     }
 
     pub fn record_client_disconnect(&self) {

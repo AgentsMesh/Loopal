@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tracing::{info, warn};
 
 use loopal_classifier::ClassifierEngine;
+use loopal_protocol::PermissionIntentRequest;
 use loopal_provider_api::{ProviderResolver, TaskType};
 use loopal_tool_api::PermissionDecision;
 
@@ -51,9 +52,7 @@ impl ClassifierPermissionHandler {
     async fn fall_back(
         &self,
         reason: String,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
+        request: &PermissionIntentRequest,
     ) -> PermissionOutcome {
         // reason: when the classifier was degraded and the user manually
         // approves, take that as a "user is engaged" signal and reset the
@@ -61,9 +60,9 @@ impl ClassifierPermissionHandler {
         // this wire-up the degraded state would persist for the rest of the
         // session even after the user demonstrates they're handling things.
         let was_degraded = self.classifier.is_degraded();
-        let o = self.fallback.decide(id, name, input).await;
+        let o = self.fallback.decide(request).await;
         if was_degraded && o.decision == PermissionDecision::Allow {
-            self.classifier.on_human_approval(name);
+            self.classifier.on_human_approval(&request.tool_name);
         }
         let combined_reason = if o.reason.is_empty() {
             reason
@@ -71,21 +70,18 @@ impl ClassifierPermissionHandler {
             format!("{reason} (fallback: {})", o.reason)
         };
         PermissionOutcome {
-            decision: o.decision,
             reason: combined_reason,
-            duration_ms: o.duration_ms,
+            ..o
         }
     }
 
     async fn apply_provider_error(
         &self,
         reason: String,
-        id: &str,
-        name: &str,
-        input: &serde_json::Value,
+        request: &PermissionIntentRequest,
     ) -> PermissionOutcome {
         match self.on_provider_error {
-            DegradedAction::Fallback => self.fall_back(reason, id, name, input).await,
+            DegradedAction::Fallback => self.fall_back(reason, request).await,
             DegradedAction::Deny => PermissionOutcome::deny(reason),
         }
     }
@@ -93,22 +89,25 @@ impl ClassifierPermissionHandler {
 
 #[async_trait]
 impl PermissionHandler for ClassifierPermissionHandler {
-    async fn decide(&self, id: &str, name: &str, input: &serde_json::Value) -> PermissionOutcome {
+    async fn decide(&self, request: &PermissionIntentRequest) -> PermissionOutcome {
+        if request.intent_seed.workflow().is_some() {
+            return self.fallback.decide(request).await;
+        }
+        let name = &request.tool_name;
+        let input = &request.action_input;
         if self.decision.get() == loopal_decision_api::DecisionMode::Manual {
-            return self.fallback.decide(id, name, input).await;
+            return self.fallback.decide(request).await;
         }
         if self.classifier.is_degraded() {
             warn!(tool = name, "classifier degraded");
-            return self
-                .fall_back("classifier degraded".into(), id, name, input)
-                .await;
+            return self.fall_back("classifier degraded".into(), request).await;
         }
         let (model, provider) = match self.resolver.resolve_for(TaskType::Classification) {
             Ok(p) => p,
             Err(e) => {
                 warn!(tool = name, error = %e, "classifier provider lookup failed");
                 return self
-                    .apply_provider_error(format!("provider lookup failed: {e}"), id, name, input)
+                    .apply_provider_error(format!("provider lookup failed: {e}"), request)
                     .await;
             }
         };
@@ -123,6 +122,7 @@ impl PermissionHandler for ClassifierPermissionHandler {
             decision: result.decision,
             reason: result.reason,
             duration_ms: result.duration_ms,
+            receipt: None,
         }
     }
 }

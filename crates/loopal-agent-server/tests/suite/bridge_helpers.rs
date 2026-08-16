@@ -33,6 +33,7 @@ pub async fn start_child_server(
             loopal_agent_server::run_server_for_test(server_t, provider, cwd, session_dir).await;
     });
     let (conn, rx) = Connection::new(client_t).into_listening();
+    let rx = crate::protected_audit_hub::filter(conn.clone(), rx);
     (conn, rx, fixture, join)
 }
 

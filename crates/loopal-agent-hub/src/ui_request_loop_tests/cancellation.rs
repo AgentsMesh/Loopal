@@ -25,6 +25,28 @@ async fn cancellation_keeps_request_id_owned_until_handler_completion() {
 }
 
 #[tokio::test]
+async fn invalid_or_mismatched_cancellation_keeps_handler_live() {
+    let (cancel, cancelled) = tokio::sync::oneshot::channel();
+    let mut in_flight = std::collections::HashMap::from([(
+        17,
+        super::super::InFlightRequest {
+            method: methods::WORKSPACE_SEARCH.name.to_string(),
+            cancel: Some(cancel),
+        },
+    )]);
+
+    super::super::cancel_request(&mut in_flight, &json!({"id": "invalid"}));
+    super::super::cancel_request(
+        &mut in_flight,
+        &json!({"id": 17, "method": methods::WORKSPACE_READ_FILE.name}),
+    );
+    assert!(in_flight.get(&17).unwrap().cancel.is_some());
+
+    super::super::cancel_request(&mut in_flight, &json!({"id": 17}));
+    cancelled.await.expect("id-only cancellation must match");
+}
+
+#[tokio::test]
 async fn aborted_handler_marks_connection_unusable() {
     let (done, mut completed) = tokio::sync::mpsc::unbounded_channel();
     let guard = super::super::CompletionGuard::new(23, done);

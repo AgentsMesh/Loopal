@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use loopal_protocol::{
     AgentStateSnapshot, BgTaskDetail, BgTaskSnapshot, BgTaskStatus, CronJobSnapshot,
-    McpServerSnapshot, ObservableAgentState, TaskSnapshot, ThreadGoal,
+    McpServerSnapshot, ObservableAgentState, TaskSnapshot, ThreadGoal, WorkflowRunsSnapshot,
 };
 
 use crate::conversation::AgentConversation;
@@ -17,6 +17,8 @@ pub struct SessionViewState {
     pub crons: Vec<CronJobSnapshot>,
     pub bg_tasks: IndexMap<String, BgTaskView>,
     pub mcp_status: Option<Vec<McpServerSnapshot>>,
+    #[serde(default)]
+    pub workflows: WorkflowRunsSnapshot,
     /// Persistent goal for the current thread (if any). Updated by the
     /// `ThreadGoalUpdated` event mutator and seeded from
     /// `AgentStateSnapshot.thread_goal` on cold start / reconnect.
@@ -36,6 +38,7 @@ impl SessionViewState {
             crons: Vec::new(),
             bg_tasks: IndexMap::new(),
             mcp_status: None,
+            workflows: WorkflowRunsSnapshot::default(),
             thread_goal: None,
             hub_degraded_since_ms: None,
         }
@@ -53,6 +56,7 @@ impl SessionViewState {
             crons: snapshot.crons,
             bg_tasks,
             mcp_status: None,
+            workflows: snapshot.workflows,
             thread_goal: snapshot.thread_goal,
             hub_degraded_since_ms: None,
         }

@@ -1,5 +1,5 @@
 use loopal_error::{AgentOutput, LoopalError, Result, TerminateReason};
-use loopal_protocol::{AgentEventPayload, AgentStatus};
+use loopal_protocol::AgentStatus;
 use loopal_provider_api::MessageRole;
 use loopal_provider_api::{ContinuationIntent, ContinuationReason};
 use tracing::{error, info};
@@ -8,7 +8,7 @@ pub const CONTEXT_OVERFLOW_BANNER: &str = "Context overflow — compacting and r
 
 use super::LifecycleMode;
 use super::cancel::TurnCancel;
-use super::input::{PendingInput, QueuedInput, WaitResult};
+use super::input::{PendingInput, QueuedInput};
 use super::runner::AgentLoopRunner;
 use super::turn_context::TurnContext;
 
@@ -19,25 +19,32 @@ impl AgentLoopRunner {
         let mut terminate_reason = TerminateReason::Goal;
         let mut server_block_retry = false;
         let mut context_overflow_retry = false;
-        // Need user input whenever the last message isn't User — covers empty
-        // store, resume-with-Assistant-tail (crash recovery), or any non-User
-        // tail. ReadyToCall's invariant would panic the debug_assert otherwise.
-        let mut needs_input = !matches!(self.turns.view().last_role(), Some(MessageRole::User));
+        let mut needs_input = !self.has_resumable_turn();
 
         loop {
+            let mut skip_provider_for_input = false;
+            let mut workflow_input_error = None;
             // ── Idle phase ──────────────────────────────────────────
             if needs_input {
                 let mut ready_for_turn = false;
                 let mut queued_input: Option<Box<QueuedInput>> = None;
                 let mut input_closed = false;
-                if matches!(self.params.config.lifecycle, LifecycleMode::Persistent) {
+                if !matches!(self.params.config.lifecycle, LifecycleMode::Ephemeral) {
                     match self.poll_pending_input().await? {
-                        PendingInput::Ready(_result) => ready_for_turn = true,
+                        PendingInput::Ready(result) => {
+                            ready_for_turn = true;
+                            skip_provider_for_input = result.blocks_provider();
+                            workflow_input_error = result.into_workflow_failure();
+                        }
                         PendingInput::Queued(input) => queued_input = Some(input),
                         PendingInput::Empty => {}
                         PendingInput::Closed => input_closed = true,
                     }
-                    if !input_closed && !ready_for_turn && queued_input.is_none() {
+                    if self.params.config.lifecycle.is_persistent()
+                        && !input_closed
+                        && !ready_for_turn
+                        && queued_input.is_none()
+                    {
                         ready_for_turn = self.goal_continuation_check().await?;
                     }
                 }
@@ -54,34 +61,60 @@ impl AgentLoopRunner {
                         break;
                     }
 
+                    let wait_for_workflow = self.params.workflow_lease_tracker.has_outstanding();
                     match self.params.config.lifecycle {
-                        LifecycleMode::Ephemeral => {
+                        LifecycleMode::Ephemeral if !wait_for_workflow => {
                             let pending = self.drain_pending_input().await;
-                            if pending.is_empty() {
+                            self.ephemeral_pending_inputs.extend(pending);
+                            let Some(env) = self.ephemeral_pending_inputs.pop_front() else {
                                 info!("ephemeral agent idle, exiting");
                                 break;
-                            }
-                            for env in &pending {
-                                self.ingest_message(env).await;
+                            };
+                            let result = self.ingest_message(&env).await;
+                            skip_provider_for_input = result.blocks_provider();
+                            workflow_input_error = result.into_workflow_failure();
+                        }
+                        LifecycleMode::Ephemeral
+                        | LifecycleMode::Persistent
+                        | LifecycleMode::WorkflowEphemeral => {
+                            let next_input = {
+                                if let Some(input) = queued_input {
+                                    Some(self.consume_queued_input(input).await)
+                                } else if wait_for_workflow
+                                    || self.params.config.lifecycle.is_persistent()
+                                {
+                                    self.wait_for_input().await?
+                                } else {
+                                    info!("workflow-aware ephemeral agent idle, exiting");
+                                    break;
+                                }
+                            };
+                            match next_input {
+                                Some(result) => {
+                                    self.interrupt.take();
+                                    skip_provider_for_input = result.blocks_provider();
+                                    workflow_input_error = result.into_workflow_failure();
+                                }
+                                None => break,
                             }
                         }
-                        LifecycleMode::Persistent => match if let Some(input) = queued_input {
-                            Some(self.consume_queued_input(input).await)
-                        } else {
-                            self.wait_for_input().await?
-                        } {
-                            Some(WaitResult::MessageAdded) => {
-                                self.interrupt.take();
-                            }
-                            Some(WaitResult::ContinuationInjected) => {
-                                self.interrupt.take();
-                            }
-                            None => break,
-                        },
                     }
                 }
             }
             needs_input = true;
+
+            if skip_provider_for_input {
+                self.emit_inbox_consumed().await;
+                if let Some(error) = workflow_input_error {
+                    last_output.clear();
+                    last_error = Some(error);
+                    terminate_reason = TerminateReason::Error;
+                    if self.params.config.lifecycle.is_one_shot() {
+                        break;
+                    }
+                }
+                continue;
+            }
 
             // ── Running phase ───────────────────────────────────────
             info!(
@@ -153,7 +186,7 @@ impl AgentLoopRunner {
                     // unrecovered turn error must terminate the loop with the real
                     // error — not fall through to "idle, exiting" which would report
                     // a successful empty result and hide the failure from the caller.
-                    if matches!(self.params.config.lifecycle, LifecycleMode::Ephemeral) {
+                    if self.params.config.lifecycle.is_one_shot() {
                         break;
                     }
                 }
@@ -162,55 +195,6 @@ impl AgentLoopRunner {
             context_overflow_retry = false;
         }
 
-        let result = match last_error {
-            Some(err) if last_output.is_empty() => err,
-            _ => last_output,
-        };
-        Ok(AgentOutput {
-            result,
-            terminate_reason,
-        })
-    }
-
-    pub(super) fn notify_observers_envelope_received(
-        &mut self,
-        source: &loopal_protocol::MessageSource,
-    ) {
-        for g in &mut self.governance {
-            g.on_envelope_received(source);
-        }
-    }
-
-    async fn emit_interrupted(&mut self) -> Result<()> {
-        info!("agent interrupted by user");
-        self.status = AgentStatus::WaitingForInput;
-        self.emit(AgentEventPayload::Interrupted).await
-    }
-
-    // finalize runs even if the Interrupted emit fails, so the turn is never
-    // left InProgress.
-    async fn collect_interrupted_turn(&mut self) -> Result<()> {
-        let emit_result = self.emit_interrupted().await;
-        self.finalize_turn_cancellation(loopal_turn::CancelledCause::UserInterrupt)
-            .await;
-        emit_result
-    }
-
-    pub async fn emit_inbox_consumed(&mut self) {
-        let ids = std::mem::take(&mut self.pending_consumed_ids);
-        for message_id in ids {
-            if let Err(e) = self
-                .emit(AgentEventPayload::InboxConsumed {
-                    envelope_id: message_id.clone(),
-                })
-                .await
-            {
-                tracing::error!(
-                    error = %e,
-                    message_id = %message_id,
-                    "agent_loop::run::emit_inbox_consumed emit failed"
-                );
-            }
-        }
+        Ok(self.guarded_output(last_output, last_error, terminate_reason))
     }
 }

@@ -46,6 +46,8 @@ pub struct SharedSession {
     /// otherwise the embedded `hub_connection` would prevent stdio EOF
     /// and block server shutdown.
     pub agent_shared: Mutex<Option<Weak<AgentShared>>>,
+    pub(crate) pending_workflow_terminals:
+        crate::workflow_terminal_pending::WorkflowTerminalPending,
 }
 
 impl SharedSession {
@@ -55,13 +57,24 @@ impl SharedSession {
         interrupt: InterruptSignal,
         interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
     ) -> Self {
+        Self::new(String::new(), input_tx, interrupt, interrupt_tx)
+    }
+
+    pub fn new(
+        session_id: String,
+        input_tx: tokio::sync::mpsc::Sender<AgentInput>,
+        interrupt: InterruptSignal,
+        interrupt_tx: Arc<tokio::sync::watch::Sender<u64>>,
+    ) -> Self {
         Self {
-            session_id: String::new(),
+            session_id,
             clients: Mutex::new(Vec::new()),
             input_tx,
             interrupt,
             interrupt_tx,
             agent_shared: Mutex::new(None),
+            pending_workflow_terminals:
+                crate::workflow_terminal_pending::WorkflowTerminalPending::new(),
         }
     }
 

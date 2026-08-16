@@ -2,14 +2,20 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
+use crate::types::AgentExecutionRef;
+
+#[path = "spawn_registry_lease.rs"]
+mod lease;
+
 pub struct SpawnRegistry {
     entries: RwLock<HashMap<String, SpawnEntry>>,
 }
 
 #[derive(Debug, Clone)]
 struct SpawnEntry {
+    execution: AgentExecutionRef,
     cwd: PathBuf,
-    parent_name: Option<String>,
+    parent: Option<AgentExecutionRef>,
 }
 
 const MAX_PARENT_HOPS: usize = 64;
@@ -28,19 +34,53 @@ impl SpawnRegistry {
     }
 
     pub fn register(&self, agent_name: String, cwd: PathBuf, parent_name: Option<String>) {
+        let execution = AgentExecutionRef::local(agent_name, 0);
+        let parent = parent_name.map(|name| AgentExecutionRef::local(name, 0));
+        self.register_exact(execution, cwd, parent);
+    }
+
+    pub(crate) fn register_exact(
+        &self,
+        execution: AgentExecutionRef,
+        cwd: PathBuf,
+        parent: Option<AgentExecutionRef>,
+    ) -> bool {
         let canonical = cwd.canonicalize().unwrap_or(cwd);
-        let mut w = self.entries.write().unwrap();
-        w.insert(
-            agent_name,
+        let mut entries = self.entries.write().unwrap();
+        if entries
+            .get(&execution.address.agent)
+            .is_some_and(|current| {
+                current.execution.connection_generation > execution.connection_generation
+            })
+        {
+            return false;
+        }
+        entries.insert(
+            execution.address.agent.clone(),
             SpawnEntry {
+                execution,
                 cwd: canonical,
-                parent_name,
+                parent,
             },
         );
+        true
     }
 
     pub fn unregister(&self, agent_name: &str) -> bool {
         self.entries.write().unwrap().remove(agent_name).is_some()
+    }
+
+    pub(crate) fn unregister_exact(&self, execution: &AgentExecutionRef) -> bool {
+        let mut entries = self.entries.write().unwrap();
+        if entries
+            .get(&execution.address.agent)
+            .is_some_and(|entry| entry.execution == *execution)
+        {
+            entries.remove(&execution.address.agent);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn cwd_of(&self, agent_name: &str) -> Option<PathBuf> {
@@ -48,7 +88,16 @@ impl SpawnRegistry {
             .read()
             .unwrap()
             .get(agent_name)
-            .map(|e| e.cwd.clone())
+            .map(|entry| entry.cwd.clone())
+    }
+
+    pub(crate) fn cwd_for(&self, execution: &AgentExecutionRef) -> Option<PathBuf> {
+        self.entries
+            .read()
+            .unwrap()
+            .get(&execution.address.agent)
+            .filter(|entry| entry.execution == *execution)
+            .map(|entry| entry.cwd.clone())
     }
 
     pub fn parent_of(&self, agent_name: &str) -> Option<String> {
@@ -56,7 +105,8 @@ impl SpawnRegistry {
             .read()
             .unwrap()
             .get(agent_name)
-            .and_then(|e| e.parent_name.clone())
+            .and_then(|entry| entry.parent.as_ref())
+            .map(|parent| parent.address.agent.clone())
     }
 
     pub fn is_root(&self, agent_name: &str) -> bool {
@@ -64,38 +114,43 @@ impl SpawnRegistry {
             .read()
             .unwrap()
             .get(agent_name)
-            .map(|e| e.parent_name.is_none())
-            .unwrap_or(false)
+            .is_some_and(|entry| entry.parent.is_none())
     }
 
     pub fn root_of(&self, agent_name: &str) -> Option<String> {
         let entries = self.entries.read().unwrap();
-        walk_to_root(&entries, agent_name, |name, _| name.to_string()).ok()
+        let start = entries.get(agent_name)?.execution.clone();
+        walk_to_root(&entries, &start, |entry| {
+            entry.execution.address.agent.clone()
+        })
+        .ok()
     }
 
-    /// Verify a caller agent may access a vault rooted at `target_cwd`.
-    /// Walks `caller_name` up the parent chain to its spawn root; access is
-    /// granted only when target_cwd and root_cwd are on the same path
-    /// branch (one is ancestor or descendant of the other, equal counts).
-    pub fn verify_vault_access(&self, caller_name: &str, target_cwd: &Path) -> bool {
-        let target = match target_cwd.canonicalize() {
-            Ok(p) => p,
-            Err(_) => return false,
-        };
+    pub(crate) fn root_execution(
+        &self,
+        execution: &AgentExecutionRef,
+    ) -> Option<AgentExecutionRef> {
         let entries = self.entries.read().unwrap();
-        let root_cwd = match walk_to_root(&entries, caller_name, |_, e| e.cwd.clone()) {
-            Ok(p) => p,
-            Err(WalkError::NotFound) => return false,
-            Err(WalkError::CycleDetected) => {
-                tracing::error!(
-                    caller = %caller_name,
-                    "vault access denied: parent chain cycle detected — \
-                     this is a config/wiring bug, not a permission denial"
-                );
-                return false;
-            }
+        walk_to_root(&entries, execution, |entry| entry.execution.clone()).ok()
+    }
+
+    pub fn verify_vault_access(&self, caller_name: &str, target_cwd: &Path) -> bool {
+        let entries = self.entries.read().unwrap();
+        let Some(start) = entries
+            .get(caller_name)
+            .map(|entry| entry.execution.clone())
+        else {
+            return false;
         };
-        root_cwd.starts_with(&target) || target.starts_with(&root_cwd)
+        verify_access(&entries, &start, target_cwd)
+    }
+
+    pub(crate) fn verify_vault_access_exact(
+        &self,
+        execution: &AgentExecutionRef,
+        target_cwd: &Path,
+    ) -> bool {
+        verify_access(&self.entries.read().unwrap(), execution, target_cwd)
     }
 }
 
@@ -105,23 +160,41 @@ impl Default for SpawnRegistry {
     }
 }
 
+fn verify_access(
+    entries: &HashMap<String, SpawnEntry>,
+    start: &AgentExecutionRef,
+    target_cwd: &Path,
+) -> bool {
+    let Ok(target) = target_cwd.canonicalize() else {
+        return false;
+    };
+    let root_cwd = match walk_to_root(entries, start, |entry| entry.cwd.clone()) {
+        Ok(path) => path,
+        Err(WalkError::NotFound) => return false,
+        Err(WalkError::CycleDetected) => {
+            tracing::error!(caller = %start.address, "vault access denied: spawn parent cycle");
+            return false;
+        }
+    };
+    root_cwd.starts_with(&target) || target.starts_with(&root_cwd)
+}
+
 fn walk_to_root<R>(
     entries: &HashMap<String, SpawnEntry>,
-    start: &str,
-    extract: impl FnOnce(&str, &SpawnEntry) -> R,
+    start: &AgentExecutionRef,
+    extract: impl FnOnce(&SpawnEntry) -> R,
 ) -> Result<R, WalkError> {
-    let mut current = start;
+    let mut current = start.clone();
     for _ in 0..MAX_PARENT_HOPS {
-        let entry = entries.get(current).ok_or(WalkError::NotFound)?;
-        match &entry.parent_name {
-            None => return Ok(extract(current, entry)),
-            Some(p) => current = p.as_str(),
+        let entry = entries
+            .get(&current.address.agent)
+            .filter(|entry| entry.execution == current)
+            .ok_or(WalkError::NotFound)?;
+        match &entry.parent {
+            None => return Ok(extract(entry)),
+            Some(parent) => current = parent.clone(),
         }
     }
-    tracing::warn!(
-        agent_name = %start,
-        max_hops = MAX_PARENT_HOPS,
-        "spawn registry: parent chain exceeded max hops (cycle detected)"
-    );
+    tracing::warn!(agent = %start.address, max_hops = MAX_PARENT_HOPS, "spawn parent cycle detected");
     Err(WalkError::CycleDetected)
 }

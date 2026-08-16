@@ -12,6 +12,7 @@ use crate::pending_relay;
 pub async fn handle_permission_response(
     hub: &Arc<Mutex<Hub>>,
     params: Value,
+    ui: &crate::request_principal::UiPrincipal,
 ) -> Result<Value, String> {
     let agent_name = params
         .get("agent_name")
@@ -28,9 +29,12 @@ pub async fn handle_permission_response(
         .get("allow")
         .and_then(|v| v.as_bool())
         .ok_or_else(|| "missing allow".to_string())?;
+    let intent_digest = params
+        .get("permission_intent_digest")
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
     let remember_session = params
         .get("remember_session")
-        .and_then(|v| v.as_bool())
+        .and_then(Value::as_bool)
         .unwrap_or(false);
     let resolved = pending_relay::resolve_permission(
         hub,
@@ -38,6 +42,8 @@ pub async fn handle_permission_response(
         &interaction_id,
         allow,
         remember_session,
+        intent_digest,
+        ui,
     )
     .await;
     Ok(json!({"resolved": resolved}))

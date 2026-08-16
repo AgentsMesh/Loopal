@@ -42,6 +42,22 @@ describe('buildSessionPanelState', () => {
     expect(state(detail).panels.some((panel) => panel.id === 'tasks')).toBe(false)
   })
 
+  it('exposes active and recent workflows as visible session work', () => {
+    const run = richView().workflows.active[0] ?? {
+      id: 'wrun_ui', runGoal: 'Render workflow', state: 'running' as const,
+      revision: 1, outputNode: 'done', createdAt: richTimestamp, updatedAt: richTimestamp,
+      counts: {
+        pending: 1, ready: 0, active: 1, succeeded: 0,
+        failed: 0, cancelled: 0, skipped: 0,
+      },
+    }
+    const detail = idleDetail({ view: {
+      ...emptyView(), workflows: { active: [run], recent: [{ ...run, id: 'wrun_done',
+        state: 'succeeded', revision: 2 }] },
+    } })
+    expect(entries(state(detail))).toEqual([['workflows', 2, false]])
+  })
+
   it('separates MCP health from contextual diagnostics', () => {
     const ready = mcp('ready', [])
     const failed = mcp('failed', ['connection lost'])

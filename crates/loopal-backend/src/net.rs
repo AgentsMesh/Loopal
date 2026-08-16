@@ -3,7 +3,6 @@
 use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::FetchResult;
-use loopal_tool_api::save_to_overflow_file;
 use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue};
 
 use crate::limits::ResourceLimits;
@@ -109,13 +108,11 @@ pub async fn fetch_url(
     use futures::StreamExt;
     let mut body_bytes = Vec::with_capacity(8192);
     let mut stream = response.bytes_stream();
-    let mut hit_limit = false;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| ToolIoError::Network(format!("read error: {e}")))?;
         body_bytes.extend_from_slice(&chunk);
         if body_bytes.len() >= limits.max_fetch_bytes {
             body_bytes.truncate(limits.max_fetch_bytes);
-            hit_limit = true;
             break;
         }
     }
@@ -126,16 +123,10 @@ pub async fn fetch_url(
             "anti-bot challenge page returned (marker: {marker}); site requires JS or interactive challenge — try an MCP browser tool or different source"
         )));
     }
-    let overflow_path = if hit_limit {
-        Some(save_to_overflow_file(&body, "fetch_body"))
-    } else {
-        None
-    };
     Ok(FetchResult {
         body,
         content_type,
         status,
-        overflow_path,
         final_url,
     })
 }

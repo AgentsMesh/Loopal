@@ -19,19 +19,16 @@ use crate::test_helpers::*;
 async fn spawn_without_uplink_fails_clearly() {
     let (hub_a, _hub_a_event_rx) = make_hub();
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
+    let error = send_agent_request(
         &hub_a,
+        "parent",
         methods::HUB_SPAWN_AGENT.name,
         json!({"name": "worker", "target_hub": "hub-b"}),
-        "parent".into(),
     )
-    .await;
+    .await
+    .expect_err("cross-hub spawn without an uplink must fail");
 
-    assert!(result.is_err());
-    assert!(
-        result.unwrap_err().contains("uplink"),
-        "should mention uplink"
-    );
+    assert!(error.to_string().contains("uplink"), "got: {error}");
 }
 
 /// Cross-hub spawn injects qualified parent "hub-a/parent" into params.
@@ -49,19 +46,18 @@ async fn spawn_injects_qualified_parent() {
     }
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
+    let result = send_agent_request(
         &hub_a,
+        "my-parent",
         methods::HUB_SPAWN_AGENT.name,
         json!({"name": "child", "target_hub": "hub-b"}),
-        "my-parent".into(),
     )
     .await;
 
-    // Error should be from spawn attempt, not routing/parent
-    if let Err(e) = &result {
+    if let Err(error) = &result {
         assert!(
-            !e.contains("uplink") && !e.contains("routing"),
-            "error should be from spawn, not parent: {e}"
+            !error.to_string().contains("principal"),
+            "managed caller must reach cross-hub spawn handling: {error}"
         );
     }
 }

@@ -9,6 +9,7 @@ import {
   type SessionPanelId, type SessionPanelState,
 } from './session-panel-state'
 import { TaskInspector } from './task-inspector'
+import { WorkflowInspector } from './workflow-inspector'
 
 export function SessionPanelContent(props: {
   readonly panelId: SessionPanelId
@@ -28,6 +29,8 @@ export function SessionPanelContent(props: {
     case 'tasks':
       return <TaskInspector key={props.state.selected?.id} view={view}
         sections={['goal', 'tasks']} showEmpty={false} />
+    case 'workflows':
+      return <WorkflowInspector view={view} />
     case 'background':
       return <TaskInspector view={view} canControl={props.canControl}
         busy={props.busy} onControl={props.onControl} sections={['background']}

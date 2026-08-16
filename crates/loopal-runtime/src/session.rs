@@ -68,6 +68,42 @@ impl SessionManager {
         Ok(self.turn_event_store.load_turns(session_id)?)
     }
 
+    pub fn load_turn_events(&self, session_id: &str) -> Result<Vec<TurnEvent>> {
+        Ok(self.turn_event_store.load_events(session_id)?)
+    }
+
+    pub fn sync_turn_events(&self, session_id: &str) -> Result<()> {
+        self.turn_event_store.sync_events(session_id)?;
+        Ok(())
+    }
+
+    /// Runs with terminal delivery intent but no durable Hub acknowledgement.
+    /// Journal corruption is surfaced so a workflow-aware root cannot exit on
+    /// an incomplete recovery view.
+    pub fn pending_workflow_delivery_run_ids(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<loopal_protocol::WorkflowRunId>> {
+        let journals = self
+            .session_store
+            .list_workflow_journals(session_id)
+            .map_err(|error| loopal_error::LoopalError::Other(error.to_string()))?;
+        let mut pending = Vec::new();
+        for journal in journals {
+            let replay = journal
+                .replay()
+                .map_err(|error| loopal_error::LoopalError::Other(error.to_string()))?;
+            if replay
+                .delivery_intents
+                .iter()
+                .any(|intent| !replay.delivery_acks.contains(&intent.delivery_id))
+            {
+                pending.push(journal.run_id().clone());
+            }
+        }
+        Ok(pending)
+    }
+
     /// Record a sub-agent reference in the parent session.
     pub fn add_sub_agent(&self, parent_session_id: &str, sub_ref: SubAgentRef) -> Result<()> {
         self.session_store
@@ -79,6 +115,13 @@ impl SessionManager {
     pub fn record_turn_event(&self, session_id: &str, event: &TurnEvent) -> Result<()> {
         self.turn_event_store
             .append_event(session_id, event)
+            .map_err(loopal_error::LoopalError::from)?;
+        Ok(())
+    }
+
+    pub fn record_turn_event_durable(&self, session_id: &str, event: &TurnEvent) -> Result<()> {
+        self.turn_event_store
+            .append_event_durable(session_id, event)
             .map_err(loopal_error::LoopalError::from)?;
         Ok(())
     }

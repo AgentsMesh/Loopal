@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use loopal_vault_api::{AuditSink, NoopAuditSink, Vault, VaultError, VaultOp, VaultResult};
+use loopal_vault_api::{
+    AuditMetadata, AuditSink, NoopAuditSink, Vault, VaultError, VaultOp, VaultResult,
+};
 use secrecy::SecretString;
 use tokio::sync::RwLock;
 
@@ -70,37 +72,67 @@ impl AgeVault {
         }
     }
 
-    async fn write_under_lock<F>(&self, mutator: F) -> VaultResult<()>
+    async fn write_under_lock<F>(
+        &self,
+        op: VaultOp,
+        key: &str,
+        metadata: &AuditMetadata<'_>,
+        mutator: F,
+    ) -> VaultResult<()>
     where
         F: FnOnce(&mut BTreeMap<String, SecretString>),
     {
         let _lock = vault_io::acquire_store_lock(&self.store_path).await?;
         self.identity.ensure_usable()?;
-        let mut map = self.read_store_now()?;
-        mutator(&mut map);
         let recipients = Recipients::load(&self.recipients_path)?;
         if recipients.is_empty() {
             return Err(VaultError::EncryptionFailed(
                 "no recipients configured".into(),
             ));
         }
+        self.audit.record(op, key, metadata)?;
+        let mut map = self.read_store_now()?;
+        mutator(&mut map);
         vault_io::write_vault(&self.store_path, &recipients, &map)?;
         let mut guard = self.cache.write().await;
         *guard = Some(map);
         Ok(())
+    }
+
+    pub async fn get_audited(
+        &self,
+        name: &str,
+        metadata: &AuditMetadata<'_>,
+    ) -> VaultResult<Option<SecretString>> {
+        self.audit.record(VaultOp::Decrypted, name, metadata)?;
+        if let Some(value) = self
+            .cache
+            .read()
+            .await
+            .as_ref()
+            .and_then(|map| map.get(name).cloned())
+        {
+            return Ok(Some(value));
+        }
+        if self.cache.read().await.is_some() {
+            return Ok(None);
+        }
+        self.identity.ensure_usable()?;
+        let mut write_guard = self.cache.write().await;
+        if write_guard.is_none() {
+            *write_guard = Some(self.read_store_now()?);
+        }
+        Ok(write_guard.as_ref().and_then(|map| map.get(name).cloned()))
     }
 }
 
 #[async_trait]
 impl Vault for AgeVault {
     async fn get(&self, name: &str) -> Option<SecretString> {
-        self.load_if_needed().await.ok()?;
-        let guard = self.cache.read().await;
-        let value = guard.as_ref().and_then(|m| m.get(name).cloned());
-        if value.is_some() {
-            self.audit.record(VaultOp::Decrypted, name, None);
-        }
-        value
+        self.get_audited(name, &AuditMetadata::default())
+            .await
+            .ok()
+            .flatten()
     }
 
     async fn list_names(&self) -> Vec<String> {
@@ -117,27 +149,32 @@ impl Vault for AgeVault {
     async fn put(&self, name: &str, value: SecretString) -> VaultResult<()> {
         vault_io::validate_secret_name(name)?;
         let owned = name.to_string();
-        self.write_under_lock(move |map| {
-            map.insert(owned, value);
-        })
-        .await?;
-        self.audit.record(VaultOp::Encrypted, name, None);
-        Ok(())
+        self.write_under_lock(
+            VaultOp::Encrypted,
+            name,
+            &AuditMetadata::default(),
+            move |map| {
+                map.insert(owned, value);
+            },
+        )
+        .await
     }
 
     async fn delete(&self, name: &str) -> VaultResult<()> {
         let owned = name.to_string();
-        self.write_under_lock(move |map| {
-            map.remove(&owned);
-        })
-        .await?;
-        self.audit.record(VaultOp::Encrypted, name, None);
-        Ok(())
+        self.write_under_lock(
+            VaultOp::Encrypted,
+            name,
+            &AuditMetadata::default(),
+            move |map| {
+                map.remove(&owned);
+            },
+        )
+        .await
     }
 
     async fn rekey(&self) -> VaultResult<()> {
-        self.write_under_lock(|_| {}).await?;
-        self.audit.record(VaultOp::Rekeyed, "", None);
-        Ok(())
+        self.write_under_lock(VaultOp::Rekeyed, "", &AuditMetadata::default(), |_| {})
+            .await
     }
 }

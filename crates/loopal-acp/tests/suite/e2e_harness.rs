@@ -1,7 +1,3 @@
-//! ACP integration test harness — real Hub + mock agent server.
-//!
-//! Tests exercise the same path as production: ACP → UiSession → Hub → Agent.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -73,6 +69,9 @@ pub async fn build_acp_harness(
     // 2. Create Hub
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(256);
     let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    hub.lock()
+        .await
+        .set_protected_audit(Arc::new(loopal_vault_api::NoopAuditSink));
 
     // 3. Start event broadcast EARLY (before agent starts)
     let _event_loop = loopal_agent_hub::start_event_loop(hub.clone(), event_rx);
@@ -105,21 +104,19 @@ pub async fn build_acp_harness(
         )
         .await;
 
-    // 6. Register agent in Hub and spawn IO loop
-    {
-        let mut h = hub.lock().await;
-        let _ = h.registry.register_connection("main", agent_conn.clone());
-    }
     let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(
         hub.clone(),
     ));
-    loopal_agent_hub::agent_io::spawn_io_loop(
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    loopal_agent_hub::agent_io::start_agent_io(
         hub.clone(),
         dispatcher,
         "main",
         agent_conn,
         agent_incoming,
+        Some(ready_tx),
     );
+    ready_rx.await.expect("agent registration");
 
     // 7. Spawn ACP adapter using UiSession
     let acp_out = Arc::new(JsonRpcTransport::with_writer(Box::new(acp_write)));

@@ -7,13 +7,102 @@ use std::sync::Arc;
 
 use tokio::sync::{Mutex, mpsc};
 
+use loopal_config::SandboxPolicy;
+use loopal_decision_api::DecisionMode;
 use loopal_ipc::connection::{Connection, Listening};
 use loopal_protocol::{
-    AgentCompletion, ControlCommand, Envelope, InterruptSignal, UserQuestionResponse,
+    AgentCompletion, ControlCommand, Envelope, InterruptSignal, QualifiedAddress,
+    UserQuestionResponse,
 };
+use loopal_tool_api::PermissionMode;
 use loopal_view_state::ViewStateReducer;
 
 use crate::topology::AgentInfo;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct AgentExecutionRef {
+    pub(crate) address: QualifiedAddress,
+    pub(crate) connection_generation: u64,
+}
+
+impl AgentExecutionRef {
+    pub(crate) fn local(agent: impl Into<String>, connection_generation: u64) -> Self {
+        Self {
+            address: QualifiedAddress::local(agent),
+            connection_generation,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RegisteredAgent {
+    pub(crate) agent_id: String,
+    pub(crate) execution: AgentExecutionRef,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AgentOrigin {
+    ManagedRoot,
+    ManagedChild,
+    ExternalTcp,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SpawnAuthority {
+    pub(crate) model: String,
+    pub(crate) permission_mode: PermissionMode,
+    pub(crate) decision_mode: DecisionMode,
+    pub(crate) sandbox_policy: SandboxPolicy,
+}
+
+impl Default for SpawnAuthority {
+    fn default() -> Self {
+        let settings = loopal_config::Settings::default();
+        Self {
+            model: settings.model,
+            permission_mode: settings.permission_mode,
+            decision_mode: settings.decision_mode,
+            sandbox_policy: settings.sandbox.policy,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AgentRuntimeFacts {
+    pub(crate) origin: AgentOrigin,
+    pub(crate) cwd: std::path::PathBuf,
+    pub(crate) root_cwd: std::path::PathBuf,
+    pub(crate) root: String,
+    pub(crate) parent: Option<AgentExecutionRef>,
+    pub(crate) depth: u32,
+    pub(crate) session_id: Option<String>,
+    pub(crate) workflow_permission_causation: Option<loopal_protocol::WorkflowPermissionCausation>,
+    pub(crate) workflow_attempt_capability_digest:
+        Option<loopal_protocol::WorkflowAttemptCapabilityDigest>,
+    pub(crate) workflow_completion_result_limit: Option<u32>,
+    pub(crate) spawn: SpawnAuthority,
+}
+
+impl AgentRuntimeFacts {
+    pub(crate) fn root(cwd: std::path::PathBuf, spawn: SpawnAuthority) -> Self {
+        let root_cwd = loopal_git::repo_root(&cwd)
+            .and_then(|root| root.canonicalize().ok())
+            .unwrap_or_else(|| cwd.clone());
+        Self {
+            origin: AgentOrigin::ManagedRoot,
+            root_cwd,
+            cwd,
+            root: loopal_protocol::ROOT_AGENT_NAME.to_string(),
+            parent: None,
+            depth: 0,
+            session_id: None,
+            workflow_permission_causation: None,
+            workflow_attempt_capability_digest: None,
+            workflow_completion_result_limit: None,
+            spawn,
+        }
+    }
+}
 
 /// Connection state for a managed agent or client.
 pub(crate) enum AgentConnectionState {
@@ -55,6 +144,7 @@ pub struct LocalChannels {
 pub(crate) struct ManagedAgent {
     pub(crate) state: AgentConnectionState,
     pub(crate) info: AgentInfo,
+    pub(crate) runtime: Option<AgentRuntimeFacts>,
     /// Hub-local generation of a local parent captured when this edge was
     /// registered. Names alone are not ownership: a reconnected same-name
     /// parent must not receive or cascade an older child's completion.

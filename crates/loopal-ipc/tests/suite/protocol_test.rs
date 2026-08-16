@@ -14,6 +14,10 @@ fn method_names_follow_convention() {
     // Control plane
     assert_eq!(methods::AGENT_CONTROL.name, "agent/control");
     assert_eq!(methods::AGENT_INTERRUPT.name, "agent/interrupt");
+    assert_eq!(
+        methods::AGENT_WORKFLOW_TERMINAL.name,
+        "agent/workflow_terminal"
+    );
 
     // Observation plane
     assert_eq!(methods::AGENT_EVENT.name, "agent/event");
@@ -32,6 +36,7 @@ fn all_agent_methods_share_prefix() {
         methods::AGENT_MESSAGE.name,
         methods::AGENT_CONTROL.name,
         methods::AGENT_INTERRUPT.name,
+        methods::AGENT_WORKFLOW_TERMINAL.name,
         methods::AGENT_EVENT.name,
         methods::AGENT_PERMISSION.name,
         methods::AGENT_QUESTION.name,
@@ -42,6 +47,30 @@ fn all_agent_methods_share_prefix() {
 }
 
 /// Verify protocol types from loopal-protocol can be serialized (IPC readiness).
+#[test]
+fn workflow_methods_are_distinct_hub_controls() {
+    let methods = [
+        methods::HUB_WORKFLOW_START.name,
+        methods::HUB_WORKFLOW_LOOKUP_START.name,
+        methods::HUB_WORKFLOW_GET.name,
+        methods::HUB_WORKFLOW_WAIT.name,
+        methods::HUB_WORKFLOW_CANCEL.name,
+    ];
+    assert_eq!(
+        methods,
+        [
+            "hub/workflow/start",
+            "hub/workflow/lookup_start",
+            "hub/workflow/get",
+            "hub/workflow/wait",
+            "hub/workflow/cancel",
+        ]
+    );
+    let unique: std::collections::HashSet<_> = methods.into_iter().collect();
+    assert_eq!(unique.len(), methods.len());
+    assert!(methods.into_iter().all(|method| method.starts_with("hub/")));
+}
+
 #[test]
 fn protocol_types_serialize() {
     use loopal_protocol::{AgentMode, ControlCommand, UserQuestionResponse};

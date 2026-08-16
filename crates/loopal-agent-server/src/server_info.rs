@@ -71,7 +71,10 @@ pub fn read_server_info(pid: u32) -> anyhow::Result<ServerInfo> {
 
 /// List all available server info files (live servers).
 pub fn list_servers() -> Vec<ServerInfo> {
-    let dir = run_dir();
+    list_servers_in(&run_dir())
+}
+
+fn list_servers_in(dir: &std::path::Path) -> Vec<ServerInfo> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -91,5 +94,29 @@ pub fn remove_server_info() {
     if path.exists() {
         let _ = std::fs::remove_file(&path);
         tracing::debug!(path = %path.display(), "removed server info");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::list_servers_in;
+
+    #[test]
+    fn listing_missing_or_mixed_runtime_directory_is_fail_closed() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(list_servers_in(&temp.path().join("missing")).is_empty());
+
+        std::fs::write(
+            temp.path().join("valid.json"),
+            r#"{"pid":7,"port":1234,"token":"token"}"#,
+        )
+        .unwrap();
+        std::fs::write(temp.path().join("invalid.json"), b"not-json").unwrap();
+        std::fs::write(temp.path().join("ignored.txt"), b"not a server record").unwrap();
+
+        let servers = list_servers_in(temp.path());
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].pid, 7);
+        assert_eq!(servers[0].port, 1234);
     }
 }

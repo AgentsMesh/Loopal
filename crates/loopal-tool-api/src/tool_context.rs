@@ -8,6 +8,8 @@ use crate::file_read_tracker::FileReadTracker;
 use crate::goal_session::GoalSession;
 use crate::memory_channel::MemoryChannel;
 use crate::output_tail::OutputTail;
+use crate::process_output::ProcessExecutor;
+use crate::protected_effect_audit::ProtectedEffectAudit;
 use crate::provider_resolver::{FetchRefinerPolicy, OneShotChatService};
 
 #[non_exhaustive]
@@ -20,6 +22,8 @@ pub struct ToolContext {
     pub one_shot_chat: Option<Arc<dyn OneShotChatService>>,
     pub fetch_refiner_policy: Option<Arc<dyn FetchRefinerPolicy>>,
     pub goal_session: Option<Arc<dyn GoalSession>>,
+    pub protected_effect_audit: Option<Arc<dyn ProtectedEffectAudit>>,
+    pub process_executor: Option<Arc<dyn ProcessExecutor>>,
     pub secret_client: Option<Arc<dyn SecretClient>>,
     pub read_tracker: Option<Arc<FileReadTracker>>,
 }
@@ -35,6 +39,8 @@ impl ToolContext {
             one_shot_chat: None,
             fetch_refiner_policy: None,
             goal_session: None,
+            protected_effect_audit: None,
+            process_executor: None,
             secret_client: None,
             read_tracker: None,
         }
@@ -95,6 +101,11 @@ impl ToolContext {
         self
     }
 
+    pub fn with_protected_effect_audit(mut self, audit: Arc<dyn ProtectedEffectAudit>) -> Self {
+        self.protected_effect_audit = Some(audit);
+        self
+    }
+
     pub fn with_secret_client(mut self, c: Arc<dyn SecretClient>) -> Self {
         self.secret_client = Some(c);
         self
@@ -122,6 +133,8 @@ impl Clone for ToolContext {
             one_shot_chat: self.one_shot_chat.clone(),
             fetch_refiner_policy: self.fetch_refiner_policy.clone(),
             goal_session: self.goal_session.clone(),
+            protected_effect_audit: self.protected_effect_audit.clone(),
+            process_executor: self.process_executor.clone(),
             secret_client: self.secret_client.clone(),
             read_tracker: self.read_tracker.clone(),
         }

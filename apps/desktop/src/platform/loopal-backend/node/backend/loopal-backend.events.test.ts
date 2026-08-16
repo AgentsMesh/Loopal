@@ -4,6 +4,8 @@ import { type DesktopEvent } from '../../../../shared/contracts'
 import { agentEvent, createBackend, timestamp } from './loopal-backend.test-fixtures'
 import { nativeTestPath } from './loopal-backend.test-paths'
 
+const intentDigest = `sha256:${'ab'.repeat(32)}`
+
 describe('LoopalDesktopBackend scoped events', () => {
   it('routes messages and equal revisions independently across two sessions', async () => {
     const { backend, hosts } = createBackend()
@@ -56,7 +58,10 @@ describe('LoopalDesktopBackend scoped events', () => {
     const events: DesktopEvent[] = []
     backend.onEvent((event) => events.push(event))
     hosts[0]!.notification('agent/event', agentEvent({
-      ToolPermissionRequest: { id: 'permission', name: 'Bash', input: { command: 'pwd' } },
+      ToolPermissionRequest: {
+        id: 'permission', name: 'Bash', input: { command: 'pwd' },
+        permission_intent: { intent_digest: intentDigest },
+      },
     }, 3, 3))
     expect(events).toContainEqual({
       type: 'permission_requested',
@@ -66,7 +71,7 @@ describe('LoopalDesktopBackend scoped events', () => {
     })
     await backend.respondPermission({
       sessionId: 'session-1', runtimeId: 'runtime-1', generation: 1,
-      agentId: 'main', requestId: 'permission', decision: 'allow_once',
+      agentId: 'main', requestId: 'permission', intentDigest, decision: 'allow_once',
     }, CancellationToken.None)
 
     const restarted = await backend.restartSession('session-1')

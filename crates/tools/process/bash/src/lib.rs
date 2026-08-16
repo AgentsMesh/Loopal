@@ -1,6 +1,10 @@
 mod bg_convert;
+
+#[cfg(test)]
+mod bg_convert_tests;
 mod env_inject;
 pub mod format;
+mod process_exec;
 pub mod strategy;
 
 use std::collections::HashMap;
@@ -32,6 +36,7 @@ impl BashTool {
 
 const DEFAULT_TIMEOUT_SECS: u64 = 300;
 const MAX_TIMEOUT: Duration = Duration::from_secs(600);
+const COMMAND_SECRET_REJECTION: &str = "Bash rejects <secret_ref:NAME> placeholders in `command` because shell command text is exposed in process arguments. Put the placeholder in `env` and reference the environment variable from `command` instead.";
 
 #[derive(Deserialize, JsonSchema)]
 pub struct BashParams {
@@ -89,10 +94,13 @@ impl TypedTool<BashParams> for BashTool {
     }
 
     fn secret_eligible_params(&self) -> &'static [&'static str] {
-        &["command", "env"]
+        &["env"]
     }
 
     fn precheck(&self, input: &BashParams) -> Option<String> {
+        if input.command.contains("<secret_ref:") {
+            return Some(COMMAND_SECRET_REJECTION.into());
+        }
         if let Some(reason) = validate_env(input.env.as_ref()) {
             return Some(reason);
         }
@@ -110,23 +118,22 @@ impl TypedTool<BashParams> for BashTool {
         input: BashParams,
         ctx: &ToolContext,
     ) -> Result<ToolResult, LoopalError> {
+        if input.command.contains("<secret_ref:") {
+            return Err(LoopalError::Tool(loopal_error::ToolError::InvalidInput(
+                COMMAND_SECRET_REJECTION.into(),
+            )));
+        }
         let env = build_env_override(input.env.as_ref());
         if input.run_in_background.unwrap_or(false) {
             let desc = input.description.as_deref().unwrap_or(&input.command);
-            return match ctx.backend.exec_background(&input.command, &env).await {
-                Ok(handle) => {
-                    let (task_id, log_path) =
-                        bg_convert::register_spawned(&self.store, handle, desc)
-                            .unwrap_or_else(|| ("(unknown)".into(), std::path::PathBuf::new()));
-                    let log_line = if log_path.as_os_str().is_empty() {
-                        String::new()
-                    } else {
-                        format!("\nFull log: {}", log_path.display())
-                    };
-                    Ok(ToolResult::success(format!(
-                        "Background process started.\nprocess_id: {task_id}{log_line}"
-                    )))
-                }
+            return match process_exec::background(ctx, &input.command, &env).await {
+                Ok(handle) => match bg_convert::register_spawned(&self.store, handle, desc) {
+                    Ok((task_id, log_path)) => Ok(ToolResult::success(format!(
+                        "Background process started.\nprocess_id: {task_id}\nFull log: {}",
+                        log_path.display()
+                    ))),
+                    Err(error) => Ok(ToolResult::error(error)),
+                },
                 Err(e) => Ok(ToolResult::error(e.to_string())),
             };
         }
@@ -145,12 +152,9 @@ async fn exec_foreground(
     let timeout = Duration::from_secs(timeout_secs).min(MAX_TIMEOUT);
 
     let exec_result = if let Some(ref tail) = ctx.output_tail {
-        ctx.backend
-            .exec_streaming(&input.command, timeout, env, tail.clone())
-            .await
+        process_exec::streaming(ctx, &input.command, timeout, env, tail.clone()).await
     } else {
-        ctx.backend
-            .exec(&input.command, timeout, env)
+        process_exec::foreground(ctx, &input.command, timeout, env)
             .await
             .map(ExecOutcome::Completed)
     };
@@ -163,16 +167,15 @@ async fn exec_foreground(
             timeout,
             partial_output,
             handle,
-        }) => {
-            let (task_id, log_path) = bg_convert::register(store, handle, &input.command)
-                .unwrap_or_else(|| ("(unknown)".into(), std::path::PathBuf::new()));
-            Ok(format::format_converted_to_background(
+        }) => match bg_convert::register(store, handle, &input.command) {
+            Ok((task_id, log_path)) => Ok(format::format_converted_to_background(
                 &task_id,
                 timeout,
                 &partial_output,
                 &log_path,
-            ))
-        }
+            )),
+            Err(error) => Ok(ToolResult::error(error)),
+        },
         Err(loopal_error::ToolIoError::Timeout(d)) => {
             Err(LoopalError::Tool(loopal_error::ToolError::Timeout(d)))
         }

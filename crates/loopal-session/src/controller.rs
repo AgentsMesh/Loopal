@@ -73,9 +73,15 @@ impl SessionController {
 
     /// Resolve a `ToolPermissionRequest` using its opaque event `id`.
     /// The matching Hub `ToolPermissionResolved` event clears the ViewClient state.
-    pub async fn respond_permission(&self, agent_name: &str, interaction_id: &str, allow: bool) {
+    pub async fn respond_permission(
+        &self,
+        agent_name: &str,
+        interaction_id: &str,
+        intent_digest: Option<loopal_protocol::PermissionIntentDigest>,
+        allow: bool,
+    ) {
         self.backend
-            .respond_permission(agent_name, interaction_id, allow)
+            .respond_permission(agent_name, interaction_id, intent_digest, allow)
             .await;
     }
 

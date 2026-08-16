@@ -10,6 +10,7 @@ fn permission_decided_preserves_decision_and_fields() {
         decision: PermissionDecision::Allow,
         reason: "user approved".into(),
         duration_ms: 42,
+        receipt: None,
     };
     let (decision, payload) = into_permission_decided("Bash", outcome);
     assert_eq!(decision, PermissionDecision::Allow);

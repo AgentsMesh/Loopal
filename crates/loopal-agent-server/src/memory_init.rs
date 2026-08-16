@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -21,6 +21,23 @@ pub async fn init_project_memory(
     session_id: &str,
     memory_config: &MemoryConfig,
 ) {
+    let session_dir = match loopal_config::session_dir(session_id) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!(error = %e, session_id, "session_dir resolution failed; memory_recall disabled");
+            return;
+        }
+    };
+    init_project_memory_at_session_dir(kernel, cwd, session_id, memory_config, session_dir).await;
+}
+
+async fn init_project_memory_at_session_dir(
+    kernel: &mut Kernel,
+    cwd: &Path,
+    session_id: &str,
+    memory_config: &MemoryConfig,
+    session_dir: PathBuf,
+) {
     let memory_dir = cwd.join(PROJECT_MEMORY_DIR);
     if !memory_dir.exists() {
         tracing::debug!(
@@ -29,14 +46,6 @@ pub async fn init_project_memory(
         );
         return;
     }
-
-    let session_dir = match loopal_config::session_dir(session_id) {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::warn!(error = %e, session_id, "session_dir resolution failed; memory_recall disabled");
-            return;
-        }
-    };
 
     let events_dir = cwd.join(PROJECT_MEMORY_EVENTS_DIR);
 
@@ -83,4 +92,32 @@ pub async fn init_project_memory(
         session_id,
         "memory_recall tool registered"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::init_project_memory_at_session_dir;
+
+    #[tokio::test]
+    async fn gitignore_and_bootstrap_failures_disable_memory_without_aborting_setup() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join(loopal_memory::PROJECT_MEMORY_DIR)).unwrap();
+        // A directory at `.gitignore` makes ensure_gitignore fail while the
+        // memory bootstrap itself is forced to fail at create_dir_all below.
+        std::fs::create_dir(temp.path().join(".gitignore")).unwrap();
+        let session_path = temp.path().join("session-target");
+        std::fs::write(&session_path, b"not a directory").unwrap();
+        let mut kernel = loopal_kernel::Kernel::new(loopal_config::Settings::default()).unwrap();
+
+        init_project_memory_at_session_dir(
+            &mut kernel,
+            temp.path(),
+            "memory-init-test",
+            &loopal_config::MemoryConfig::default(),
+            session_path,
+        )
+        .await;
+
+        assert!(kernel.get_tool("memory_recall").is_none());
+    }
 }

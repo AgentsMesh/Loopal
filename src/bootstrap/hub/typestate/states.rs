@@ -43,6 +43,7 @@ pub struct RootPending {
     pub(crate) agent_proc: loopal_agent_client::AgentProcess,
     pub(crate) client_conn:
         Arc<loopal_ipc::connection::Connection<loopal_ipc::connection::Listening>>,
+    pub(crate) workflow_runtime: Option<loopal_agent_hub::workflow::WorkflowRuntime>,
 }
 
 pub struct Ready {
@@ -50,4 +51,5 @@ pub struct Ready {
     pub(crate) hub_token: String,
     pub(crate) agent_proc: loopal_agent_client::AgentProcess,
     pub(crate) root_session_id: String,
+    pub(crate) workflow_runtime: Option<loopal_agent_hub::workflow::WorkflowRuntime>,
 }

@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use loopal_config::{CompactionSettings, ResolvedConfig, Settings};
 use loopal_protocol::{AgentEvent, AgentEventPayload};
-use loopal_provider_api::{ContentBlock, Message, MessageRole, ModelRouter};
+use loopal_provider_api::{ContentBlock, Message, MessageRole, ModelRouter, ThinkingConfig};
 use loopal_runtime::frontend::traits::AgentFrontend;
-use loopal_turn::{InjectionKind, Turn, TurnOutcome, TurnStep, TurnTrigger};
+use loopal_turn::{InjectionKind, Turn, TurnStep, TurnTrigger};
 
 use crate::params::StartParams;
 
@@ -28,6 +28,13 @@ pub fn build_microcompact_idle(settings: &CompactionSettings) -> Duration {
         return Duration::ZERO;
     }
     Duration::from_secs(settings.microcompact_idle_minutes * 60)
+}
+
+pub fn thinking_inputs(config: &ResolvedConfig) -> (ThinkingConfig, Option<ThinkingConfig>) {
+    (
+        config.settings.thinking.clone(),
+        config.workflow_preset_thinking_recommendation.clone(),
+    )
 }
 
 /// Spawn the sub-agent lifecycle forwarder. Listens for `SubAgentSpawned`
@@ -58,8 +65,10 @@ pub fn spawn_sub_agent_forwarder(
 /// history on its first call (wire-build reads from `TurnStore`, never
 /// from the projected `ContextStore` view).
 ///
-/// Returns `None` when fork is absent / empty / unparseable, OR when the
-/// session is resuming (resume takes precedence over fork).
+/// Returns an in-progress kickoff turn. The setup path persists it before
+/// starting the runtime so the first LLM call and crash recovery share one
+/// durable turn. Returns `None` when fork is absent / empty / unparseable, OR
+/// when the session is resuming (resume takes precedence over fork).
 pub fn build_fork_synthetic_turn(start: &StartParams) -> Option<Turn> {
     if start.resume.is_some() {
         return None;
@@ -71,19 +80,16 @@ pub fn build_fork_synthetic_turn(start: &StartParams) -> Option<Turn> {
     if messages.is_empty() {
         return None;
     }
-    let text = render_fork_as_text(&messages);
+    let mut text = render_fork_as_text(&messages);
+    if let Some(prompt) = start.prompt.as_deref() {
+        text.push_str(loopal_context::fork::FORK_BOILERPLATE);
+        text.push_str(prompt);
+    }
     let mut turn = Turn::new(TurnTrigger::Resume);
     turn.body.steps.push(TurnStep::Injection {
         kind: InjectionKind::SystemNote,
         text,
     });
-    if let Some(prompt) = start.prompt.as_deref() {
-        turn.body.steps.push(TurnStep::Injection {
-            kind: InjectionKind::SystemNote,
-            text: format!("{}{prompt}", loopal_context::fork::FORK_BOILERPLATE),
-        });
-    }
-    turn.outcome = TurnOutcome::Complete;
     Some(turn)
 }
 
@@ -138,4 +144,91 @@ pub fn collect_feature_tags(config: &ResolvedConfig, has_memory_channel: bool) -
         features.push("secrets".into());
     }
     features
+}
+
+#[cfg(test)]
+mod thinking_input_tests {
+    use std::sync::Arc;
+
+    use loopal_config::ConfigResolver;
+    use loopal_provider_api::EffortLevel;
+    use loopal_vault_api::{SecretString, Vault, VaultResult};
+
+    use super::*;
+
+    struct EmptyVault;
+
+    #[async_trait::async_trait]
+    impl Vault for EmptyVault {
+        async fn get(&self, _name: &str) -> Option<SecretString> {
+            None
+        }
+
+        async fn list_names(&self) -> Vec<String> {
+            Vec::new()
+        }
+
+        async fn put(&self, _name: &str, _value: SecretString) -> VaultResult<()> {
+            Ok(())
+        }
+
+        async fn delete(&self, _name: &str) -> VaultResult<()> {
+            Ok(())
+        }
+
+        async fn rekey(&self) -> VaultResult<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn keeps_explicit_setting_and_recommendation_distinct() {
+        let mut config = ConfigResolver::new().resolve().unwrap();
+        config.settings.thinking = ThinkingConfig::Disabled;
+        config.workflow_preset_thinking_recommendation = Some(ThinkingConfig::Effort {
+            level: EffortLevel::Max,
+        });
+
+        let (configured, recommendation) = thinking_inputs(&config);
+
+        assert!(matches!(configured, ThinkingConfig::Disabled));
+        assert!(matches!(
+            recommendation,
+            Some(ThinkingConfig::Effort {
+                level: EffortLevel::Max
+            })
+        ));
+    }
+
+    #[test]
+    fn default_thinking_has_no_preset_recommendation() {
+        let config = ConfigResolver::new().resolve().unwrap();
+        let (configured, recommendation) = thinking_inputs(&config);
+
+        assert!(matches!(configured, ThinkingConfig::Auto));
+        assert!(recommendation.is_none());
+    }
+
+    #[test]
+    fn microcompact_minutes_map_to_duration_and_zero_disables() {
+        let mut settings = CompactionSettings {
+            microcompact_idle_minutes: 0,
+        };
+        assert_eq!(build_microcompact_idle(&settings), Duration::ZERO);
+
+        settings.microcompact_idle_minutes = 7;
+        assert_eq!(build_microcompact_idle(&settings), Duration::from_secs(420));
+    }
+
+    #[test]
+    fn feature_tags_respect_disabled_memory_and_present_vault() {
+        let mut config = ConfigResolver::new().resolve().unwrap();
+        config.settings.memory.enabled = false;
+        config.secrets = Some(Arc::new(EmptyVault));
+
+        let features = collect_feature_tags(&config, true);
+
+        assert!(!features.iter().any(|feature| feature == "memory"));
+        assert!(features.iter().any(|feature| feature == "secrets"));
+    }
 }

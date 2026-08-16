@@ -10,7 +10,7 @@ use tokio::sync::{Mutex, mpsc};
 #[tokio::test]
 async fn full_event_queue_delivers_resolved_before_agent_response() {
     let (event_tx, mut event_rx) = mpsc::channel::<AgentEvent>(1);
-    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
+    let hub = crate::permission_support::hub_with_noop_audit(event_tx);
     let ui = UiSession::connect(hub.clone(), "desktop", UiCapabilities::ALL).await;
     let (agent, _incoming) = hub_server::connect_local(hub.clone(), "main");
 
@@ -18,11 +18,7 @@ async fn full_event_queue_delivers_resolved_before_agent_response() {
         agent
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({
-                    "tool_call_id": "queue-full",
-                    "tool_name": "Bash",
-                    "tool_input": {"command": "pwd"},
-                }),
+                crate::permission_request("queue-full", "Bash", json!({"command": "pwd"})),
             )
             .await
     });
@@ -38,10 +34,10 @@ async fn full_event_queue_delivers_resolved_before_agent_response() {
     })
     .await
     .unwrap();
-    let interaction_id = crate::permission_interaction_id(&hub, "main", "queue-full").await;
+    let interaction = crate::permission_interaction(&hub, "main", "queue-full").await;
 
     ui.client
-        .respond_permission("main", &interaction_id, true)
+        .respond_permission("main", &interaction.id, Some(interaction.digest), true)
         .await;
     tokio::task::yield_now().await;
     assert!(
@@ -60,7 +56,7 @@ async fn full_event_queue_delivers_resolved_before_agent_response() {
         .unwrap();
     assert!(matches!(
         terminal.payload,
-        AgentEventPayload::ToolPermissionResolved { ref id } if id == &interaction_id
+        AgentEventPayload::ToolPermissionResolved { ref id } if id == &interaction.id
     ));
 
     let response = tokio::time::timeout(Duration::from_secs(1), request)
@@ -81,11 +77,7 @@ async fn closed_terminal_queue_invalidates_hub_instead_of_responding_silently() 
         agent
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({
-                    "tool_call_id": "closed-terminal-queue",
-                    "tool_name": "Bash",
-                    "tool_input": {},
-                }),
+                crate::permission_request("closed-terminal-queue", "Bash", json!({})),
             )
             .await
     });
@@ -101,13 +93,12 @@ async fn closed_terminal_queue_invalidates_hub_instead_of_responding_silently() 
     })
     .await
     .unwrap();
-    let interaction_id =
-        crate::permission_interaction_id(&hub, "main", "closed-terminal-queue").await;
+    let interaction = crate::permission_interaction(&hub, "main", "closed-terminal-queue").await;
 
     drop(event_rx);
     let shutdown = hub.lock().await.shutdown_signal.clone();
     ui.client
-        .respond_permission("main", &interaction_id, true)
+        .respond_permission("main", &interaction.id, Some(interaction.digest), true)
         .await;
     tokio::time::timeout(Duration::from_secs(1), shutdown.notified())
         .await

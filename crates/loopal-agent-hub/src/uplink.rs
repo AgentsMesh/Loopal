@@ -15,23 +15,23 @@ use loopal_ipc::connection::{Connection, Incoming, Listening};
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
+use crate::request_principal::{HubRequestPrincipal, TrustedMetaHubPrincipal};
+
 const REVERSE_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
+#[path = "uplink/agent_result.rs"]
+mod agent_result;
+#[cfg(test)]
+#[path = "uplink_response_failure_tests.rs"]
+mod response_failure_tests;
+#[cfg(test)]
+#[path = "uplink_result_tests.rs"]
+mod result_tests;
 #[path = "uplink/reverse_route.rs"]
 pub(crate) mod reverse_route;
-
-/// Capability token proving a request came from this Hub's authenticated
-/// reverse MetaHub transport. Its private field prevents string identities
-/// from manufacturing the authority.
-pub(crate) struct TrustedMetaHubContext {
-    connection: Arc<Connection<Listening>>,
-}
-
-impl TrustedMetaHubContext {
-    pub(crate) fn matches(&self, uplink: &HubUplink) -> bool {
-        Arc::ptr_eq(&self.connection, uplink.connection())
-    }
-}
+#[cfg(test)]
+#[path = "uplink_tests.rs"]
+mod tests;
 
 /// Connection from a Hub to its parent MetaHub.
 ///
@@ -120,75 +120,27 @@ pub async fn handle_reverse_requests(
                     let ok = if let Ok(env) =
                         serde_json::from_value::<loopal_protocol::Envelope>(params)
                     {
-                        // Remote agent completions arrive as a typed AgentResult
-                        // source (set by the origin hub, survives SNAT). The
-                        // child name is the bare agent segment.
-                        let is_agent_result = matches!(
-                            &env.source,
-                            loopal_protocol::MessageSource::AgentResult { .. }
-                        );
-                        let parent_generation =
-                            if let loopal_protocol::MessageSource::AgentResult { child } =
-                                &env.source
-                            {
-                                // Pre-metadata envelopes are successful legacy
-                                // completions; new envelopes preserve reason+result.
-                                let completion =
-                                    env.agent_completion.clone().unwrap_or_else(|| {
-                                        loopal_protocol::AgentCompletion::goal(Some(
-                                            env.content.text.clone(),
-                                        ))
-                                    });
-                                let drop_completion = {
-                                    let h = hub.lock().await;
-                                    !h.is_active_uplink_connection(&conn)
-                                        || h.should_drop_quarantined_completion(&child.agent, &conn)
-                                };
-                                if drop_completion {
-                                    tracing::warn!(agent = %child.agent, "dropping completion from stale/quarantined uplink lease");
-                                    None
-                                } else if crate::finish::cache_cross_hub_completion_if_spawning(
-                                    &hub,
-                                    &child.agent,
-                                    completion.clone(),
-                                    env.clone(),
-                                )
-                                .await
-                                {
-                                    // The spawn coordinator drains this typed
-                                    // completion after SubAgentSpawned admission.
-                                    None
-                                } else {
-                                    crate::finish::record_cross_hub_completion_from_uplink(
-                                        &hub,
-                                        &child.agent,
-                                        completion,
-                                        &conn,
-                                    )
-                                    .await
-                                    .local_parent_generation()
-                                }
-                            } else {
-                                None
-                            };
-                        // Defense in depth: target should be local at this point
-                        // (MetaHub router consumed the next-hop hub via DNAT).
                         debug_assert!(
                             env.target.is_local(),
                             "target should be local after MetaHub DNAT, got {:?}",
                             env.target
                         );
-                        if let Some(parent_generation) = parent_generation {
-                            reverse_route::deliver_for_generation(&hub, &env, parent_generation)
+                        match agent_result::admit(&hub, &conn, env).await {
+                            agent_result::Admission::NotAgentResult(envelope) => {
+                                reverse_route::deliver(&hub, &envelope).await
+                            }
+                            agent_result::Admission::Deliver {
+                                envelope,
+                                parent_generation,
+                            } => {
+                                reverse_route::deliver_for_generation(
+                                    &hub,
+                                    &envelope,
+                                    parent_generation,
+                                )
                                 .await
-                        } else if !is_agent_result {
-                            reverse_route::deliver(&hub, &env).await
-                        } else {
-                            // The completion was consumed by a foreground
-                            // wait_agent call (or was a duplicate). Its
-                            // transport still succeeded even though it is not
-                            // a new parent input.
-                            true
+                            }
+                            agent_result::Admission::Consumed => true,
                         }
                     } else {
                         false
@@ -197,20 +149,17 @@ pub async fn handle_reverse_requests(
                         break;
                     }
                 } else {
-                    let result = if method == methods::HUB_REMOTE_RELAY.name {
-                        let trusted = TrustedMetaHubContext {
-                            connection: conn.clone(),
-                        };
-                        crate::remote_relay::handle(&hub, params, &trusted).await
-                    } else {
-                        crate::dispatch::dispatch_hub_request_with(
-                            &dispatcher,
-                            &method,
-                            params,
-                            format!("uplink:{hub_name}"),
-                        )
-                        .await
-                    };
+                    let principal = Arc::new(HubRequestPrincipal::TrustedMetaHub(
+                        TrustedMetaHubPrincipal::new(conn.clone()),
+                    ));
+                    let result = crate::dispatch::dispatch_hub_request_with_principal(
+                        &hub,
+                        &dispatcher,
+                        &method,
+                        params,
+                        principal,
+                    )
+                    .await;
                     if !respond_reverse(&conn, id, result).await {
                         break;
                     }

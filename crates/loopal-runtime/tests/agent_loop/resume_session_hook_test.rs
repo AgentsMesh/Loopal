@@ -104,6 +104,7 @@ fn build_harness(hooks: Vec<Arc<dyn SessionResumeHook>>) -> Harness {
             frontend,
             session_manager: fixture.session_manager(),
             decision_context: loopal_runtime::frontend::DecisionContext::with_cwd("/tmp/test"),
+            protected_effect_audit: super::noop_protected_effect_audit(),
         },
         primary,
         super::make_test_budget(),

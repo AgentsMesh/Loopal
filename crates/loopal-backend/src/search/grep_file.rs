@@ -5,10 +5,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use loopal_error::ToolIoError;
 use loopal_tool_api::backend_types::{FileMatchResult, GrepOptions, GrepSearchResult};
-use loopal_tool_api::save_to_overflow_file;
 
 use crate::limits::ResourceLimits;
-use crate::search::{binary, grep_match, overflow_fmt};
+use crate::search::{binary, grep_match};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn search_one_file(
@@ -52,18 +51,6 @@ pub(crate) fn empty_result() -> GrepSearchResult {
         file_matches: Vec::new(),
         total_match_count: 0,
         timed_out: false,
-        overflow_path: None,
-    }
-}
-
-pub(crate) fn maybe_save_overflow(truncated: bool, matches: &[FileMatchResult]) -> Option<String> {
-    if truncated {
-        Some(save_to_overflow_file(
-            &overflow_fmt::serialize_grep_results(matches),
-            "grep_results",
-        ))
-    } else {
-        None
     }
 }
 
@@ -85,7 +72,6 @@ pub(crate) fn search_single_file(
         return Ok(empty_result());
     }
     let max = opts.max_matches.min(limits.max_grep_matches).max(1);
-    let truncated = indices.len() > max;
     let count = indices.len().min(max);
     let limited: BTreeSet<_> = indices.iter().copied().take(count).collect();
     let groups = grep_match::collect_context_groups(
@@ -98,12 +84,10 @@ pub(crate) fn search_single_file(
         path: path.to_string_lossy().into_owned(),
         groups,
     }];
-    let overflow_path = maybe_save_overflow(truncated, &file_matches);
     Ok(GrepSearchResult {
         total_match_count: count,
         timed_out: false,
         file_matches,
-        overflow_path,
     })
 }
 

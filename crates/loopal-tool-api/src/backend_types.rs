@@ -40,7 +40,6 @@ pub struct FetchResult {
     pub body: String,
     pub content_type: Option<String>,
     pub status: u16,
-    pub overflow_path: Option<String>,
     // Populated only when redirect host differs from the requested URL —
     // signals to caller that following is a cross-origin decision.
     pub final_url: Option<String>,
@@ -82,7 +81,6 @@ pub struct GlobSearchResult {
     pub entries: Vec<GlobEntry>,
     pub truncated: bool,
     pub timed_out: bool,
-    pub overflow_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -110,7 +108,6 @@ pub struct GrepSearchResult {
     pub file_matches: Vec<FileMatchResult>,
     pub total_match_count: usize,
     pub timed_out: bool,
-    pub overflow_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]

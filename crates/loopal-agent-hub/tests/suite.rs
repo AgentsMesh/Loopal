@@ -5,24 +5,10 @@ use std::time::Duration;
 use loopal_agent_hub::Hub;
 use tokio::sync::Mutex;
 
-async fn permission_interaction_id(hub: &Arc<Mutex<Hub>>, agent: &str, logical_id: &str) -> String {
-    tokio::time::timeout(Duration::from_secs(2), async {
-        loop {
-            if let Some(id) = hub
-                .lock()
-                .await
-                .pending_permissions
-                .get(&(agent.to_string(), logical_id.to_string()))
-                .map(|info| info.interaction_id.clone())
-            {
-                return id;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("permission interaction should become pending")
-}
+#[path = "suite/permission_support.rs"]
+mod permission_support;
+
+use permission_support::{permission_interaction, permission_interaction_id, permission_request};
 
 async fn plan_interaction_id(hub: &Arc<Mutex<Hub>>, agent: &str, logical_id: &str) -> String {
     tokio::time::timeout(Duration::from_secs(2), async {
@@ -47,10 +33,14 @@ async fn plan_interaction_id(hub: &Arc<Mutex<Hub>>, agent: &str, logical_id: &st
 mod advanced_scenarios_test;
 #[path = "suite/agent_completed_result_test.rs"]
 mod agent_completed_result_test;
+#[path = "suite/agent_method_acl_matrix_test.rs"]
+mod agent_method_acl_matrix_test;
 #[path = "suite/collaboration_test.rs"]
 mod collaboration_test;
 #[path = "suite/completed_agent_tombstone_test.rs"]
 mod completed_agent_tombstone_test;
+#[path = "suite/completion_after_error_test.rs"]
+mod completion_after_error_test;
 #[path = "suite/completion_injection_test.rs"]
 mod completion_injection_test;
 #[path = "suite/completion_mock_llm_e2e_test.rs"]
@@ -85,6 +75,8 @@ mod e2e_secret_access_boundary_test;
 mod e2e_secret_ipc_test;
 #[path = "suite/event_router_test.rs"]
 mod event_router_test;
+#[path = "suite/event_sink_guard_test.rs"]
+mod event_sink_guard_test;
 #[path = "suite/hub_integration_test.rs"]
 mod hub_integration_test;
 #[path = "suite/hub_lifecycle_test.rs"]
@@ -101,6 +93,8 @@ mod interaction_cleanup_test;
 mod interaction_generation_test;
 #[path = "suite/interaction_terminal_delivery_test.rs"]
 mod interaction_terminal_delivery_test;
+#[path = "suite/mcp_dispatch_test.rs"]
+mod mcp_dispatch_test;
 #[path = "suite/multi_agent_test.rs"]
 mod multi_agent_test;
 #[path = "suite/multi_ui_attach_test.rs"]
@@ -109,16 +103,36 @@ mod multi_ui_attach_test;
 mod multi_ui_consistency_test;
 #[path = "suite/parallel_spawn_test.rs"]
 mod parallel_spawn_test;
+#[path = "suite/permission_audit_fail_closed_test.rs"]
+mod permission_audit_fail_closed_test;
+#[path = "suite/permission_decision_audit_hub_test.rs"]
+mod permission_decision_audit_hub_test;
+#[path = "suite/permission_delivery_test.rs"]
+mod permission_delivery_test;
+#[path = "suite/permission_generation_test.rs"]
+mod permission_generation_test;
+#[path = "suite/permission_intent_v2_test.rs"]
+mod permission_intent_v2_test;
+#[path = "suite/permission_interrupt_grant_test.rs"]
+mod permission_interrupt_grant_test;
 #[path = "suite/permission_lifecycle_test.rs"]
 mod permission_lifecycle_test;
 #[path = "suite/permission_race_test.rs"]
 mod permission_race_test;
 #[path = "suite/permission_session_grant_test.rs"]
 mod permission_session_grant_test;
+#[path = "suite/permission_ui_lease_test.rs"]
+mod permission_ui_lease_test;
 #[path = "suite/plan_approval_relay_test.rs"]
 mod plan_approval_relay_test;
+#[path = "suite/protected_audit_support.rs"]
+mod protected_audit_support;
+#[path = "suite/protected_effect_audit_hub_test.rs"]
+mod protected_effect_audit_hub_test;
 #[path = "suite/race_condition_test.rs"]
 mod race_condition_test;
+#[path = "suite/raw_agent_event_authority_test.rs"]
+mod raw_agent_event_authority_test;
 #[path = "suite/relay_test.rs"]
 mod relay_test;
 #[path = "suite/secret_test_helpers.rs"]
@@ -127,6 +141,10 @@ mod secret_test_helpers;
 mod spawn_lifecycle_test;
 #[path = "suite/spawn_prepare_test.rs"]
 mod spawn_prepare_test;
+#[path = "suite/spawn_real_process_test.rs"]
+mod spawn_real_process_test;
+#[path = "suite/spawn_registration_validation_test.rs"]
+mod spawn_registration_validation_test;
 #[path = "suite/spawn_registry_test.rs"]
 mod spawn_registry_test;
 #[path = "suite/spawn_remote_test.rs"]

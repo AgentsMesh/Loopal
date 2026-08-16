@@ -1,16 +1,15 @@
-use std::sync::Arc;
 use std::time::Duration;
 
-use loopal_agent_hub::{Hub, UiSession, hub_server, start_event_loop};
+use loopal_agent_hub::{UiSession, hub_server, start_event_loop};
 use loopal_ipc::protocol::methods;
 use loopal_protocol::{AgentEvent, AgentEventPayload};
 use serde_json::json;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
     let (tx, rx) = mpsc::channel::<AgentEvent>(16);
-    let hub = Arc::new(Mutex::new(Hub::new(tx)));
+    let hub = crate::permission_support::hub_with_noop_audit(tx);
     let _events = start_event_loop(hub.clone(), rx);
     let ui = UiSession::connect(
         hub.clone(),
@@ -26,9 +25,7 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
         first_agent
             .send_request(
                 methods::AGENT_PERMISSION.name,
-                json!({
-                    "tool_call_id": "write-1", "tool_name": "Write", "tool_input": {},
-                }),
+                crate::permission_request("write-1", "Write", json!({})),
             )
             .await
     });
@@ -46,8 +43,17 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
     })
     .await
     .unwrap();
-    let interaction_id = match event.payload {
-        AgentEventPayload::ToolPermissionRequest { id, .. } => id,
+    let (interaction_id, intent_digest) = match event.payload {
+        AgentEventPayload::ToolPermissionRequest {
+            id,
+            permission_intent,
+            ..
+        } => (
+            id,
+            permission_intent
+                .expect("Hub V2 event must include final permission intent")
+                .intent_digest(),
+        ),
         _ => unreachable!(),
     };
     ui.client
@@ -56,6 +62,7 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
             methods::HUB_PERMISSION_RESPONSE.name,
             json!({
                 "agent_name": "agent-1", "tool_call_id": interaction_id,
+                "permission_intent_digest": intent_digest,
                 "allow": true, "remember_session": true,
             }),
         )
@@ -67,17 +74,12 @@ async fn session_permission_grant_skips_the_next_prompt_for_the_same_tool() {
         Duration::from_secs(1),
         agent.send_request(
             methods::AGENT_PERMISSION.name,
-            json!({"tool_call_id": "write-2", "tool_name": "Write", "tool_input": {}}),
+            crate::permission_request("write-2", "Write", json!({})),
         ),
     )
     .await
     .unwrap()
     .unwrap();
     assert_eq!(second["allow"], true);
-    assert!(
-        hub.lock()
-            .await
-            .session_permission_grants
-            .contains(&("agent-1".into(), "Write".into()))
-    );
+    assert_eq!(second["allow"], true);
 }

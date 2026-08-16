@@ -1,15 +1,18 @@
-use loopal_provider_api::ContentBlock;
 use loopal_tool_invocation::{CancelCause, ToolResultMetadata};
+
+use super::tool_result_sink::PendingToolResult;
 use tracing::Instrument;
 
 use super::cancel::TurnCancel;
 use super::runner::AgentLoopRunner;
 use super::sandbox_precheck;
 use super::tools_check_one::CheckOne;
+use crate::tool_action::PreparedToolAction;
+use crate::tool_prepare::{ToolPreparation, prepare_tool_action};
 
 pub(super) struct CheckResult {
-    pub approved: Vec<(String, String, serde_json::Value)>,
-    pub denied: Vec<(usize, ContentBlock)>,
+    pub approved: Vec<PreparedToolAction>,
+    pub denied: Vec<(usize, PendingToolResult)>,
 }
 
 impl AgentLoopRunner {
@@ -41,16 +44,43 @@ impl AgentLoopRunner {
                 break;
             }
             processed += 1;
-            let orig_idx = tool_uses
+            let original_index = tool_uses
                 .iter()
-                .position(|(tid, _, _)| tid == id)
+                .position(|(tool_id, _, _)| tool_id == id)
                 .unwrap_or(0);
+            let prepared = match prepare_tool_action(
+                &self.params.deps.kernel,
+                id,
+                name,
+                input.clone(),
+            )
+            .await
+            {
+                Ok(ToolPreparation::Prepared(action)) => *action,
+                Ok(ToolPreparation::Denied(message)) => {
+                    let block = self
+                        .pending_tool_result(id, name, message, true, None)
+                        .await?;
+                    denied.push((original_index, block));
+                    continue;
+                }
+                Err(
+                    error @ loopal_error::LoopalError::Tool(loopal_error::ToolError::NotFound(_)),
+                ) => {
+                    let block = self
+                        .pending_tool_result(id, name, error.to_string(), true, None)
+                        .await?;
+                    denied.push((original_index, block));
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
 
-            match self.check_one_tool(id, name, input).await? {
-                CheckOne::Denied(block) => denied.push((orig_idx, block)),
-                CheckOne::Approved => approved.push((id.clone(), name.clone(), input.clone())),
-                CheckOne::NeedsClassify(annotated) => {
-                    needs_classify.push((orig_idx, id.clone(), name.clone(), annotated));
+            match self.check_one_tool(prepared).await? {
+                CheckOne::Denied(block) => denied.push((original_index, block)),
+                CheckOne::Approved(action) => approved.push(action),
+                CheckOne::NeedsClassify(action) => {
+                    needs_classify.push((original_index, action));
                 }
             }
         }
@@ -58,8 +88,9 @@ impl AgentLoopRunner {
         self.resolve_pending(&mut approved, &mut denied, needs_classify, cancel)
             .await?;
 
-        for (_, name, input) in &approved {
-            let extracted = sandbox_precheck::extract_paths(name, input);
+        for action in &approved {
+            let extracted =
+                sandbox_precheck::extract_paths(action.tool_name(), action.placeholder_input());
             let needs = sandbox_precheck::check_paths(self.tool_ctx.backend.as_ref(), &extracted);
             if !needs.is_empty() {
                 sandbox_precheck::approve_all(self.tool_ctx.backend.as_ref(), &needs);
@@ -67,12 +98,12 @@ impl AgentLoopRunner {
         }
 
         for (id, name, _) in &remaining[processed..] {
-            let orig_idx = tool_uses
+            let original_index = tool_uses
                 .iter()
-                .position(|(tid, _, _)| tid == id)
+                .position(|(tool_id, _, _)| tool_id == id)
                 .unwrap_or(0);
             let block = self
-                .emit_and_block(
+                .pending_tool_result(
                     id,
                     name,
                     "Interrupted by user",
@@ -80,7 +111,7 @@ impl AgentLoopRunner {
                     Some(ToolResultMetadata::cancelled(CancelCause::UserInterrupt)),
                 )
                 .await?;
-            denied.push((orig_idx, block));
+            denied.push((original_index, block));
         }
 
         Ok(CheckResult { approved, denied })

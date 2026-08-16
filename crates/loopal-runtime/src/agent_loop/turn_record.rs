@@ -13,10 +13,23 @@ struct JsonlLogger<'a> {
     session_id: &'a str,
 }
 
+struct DurableJsonlLogger<'a> {
+    sm: &'a SessionManager,
+    session_id: &'a str,
+}
+
 impl TurnEventLogger for JsonlLogger<'_> {
     fn persist(&self, event: &TurnEvent) -> Result<(), PersistError> {
         self.sm
             .record_turn_event(self.session_id, event)
+            .map_err(|e| PersistError(e.to_string()))
+    }
+}
+
+impl TurnEventLogger for DurableJsonlLogger<'_> {
+    fn persist(&self, event: &TurnEvent) -> Result<(), PersistError> {
+        self.sm
+            .record_turn_event_durable(self.session_id, event)
             .map_err(|e| PersistError(e.to_string()))
     }
 }
@@ -34,10 +47,25 @@ impl AgentLoopRunner {
         self.turns.try_start_turn(trigger, &logger)
     }
 
+    pub(super) fn start_durable_turn_record(&mut self, trigger: TurnTrigger) -> Option<TurnId> {
+        let logger = DurableJsonlLogger {
+            sm: &self.params.deps.session_manager,
+            session_id: &self.params.session.id,
+        };
+        self.turns.try_start_turn(trigger, &logger)
+    }
+
     pub(super) async fn ensure_resume_turn_record(&mut self) -> loopal_error::Result<bool> {
-        if self.turns.current_turn_id().is_some()
-            || self.start_turn_record(TurnTrigger::Resume).is_some()
-        {
+        if self.turns.current_turn_id().is_some() {
+            return Ok(true);
+        }
+        let recovered_workflow_trigger =
+            super::workflow_terminal_match::resume_trigger(self.turns.store().turns());
+        let started = match recovered_workflow_trigger {
+            Some(trigger) => self.start_durable_turn_record(trigger),
+            None => self.start_turn_record(TurnTrigger::Resume),
+        };
+        if started.is_some() {
             return Ok(true);
         }
         tracing::error!("TurnStarted persist failed on resume; cannot execute turn");
@@ -147,9 +175,8 @@ impl AgentLoopRunner {
             );
         }
         for turn in turns {
-            if self.start_turn_record(turn.trigger).is_none() {
-                continue;
-            }
+            self.start_turn_record(turn.trigger)
+                .expect("seed_test_turns: start_turn_record must succeed");
             for step in turn.body.steps {
                 self.append_step_record(step)
                     .expect("seed_test_turns: append_step_record must succeed");

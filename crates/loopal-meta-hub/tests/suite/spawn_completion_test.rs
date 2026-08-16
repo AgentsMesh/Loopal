@@ -5,8 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::Mutex;
 
-use loopal_agent_hub::spawn_manager::register_agent_connection;
-use loopal_ipc::connection::{Connection, Incoming};
+use loopal_ipc::connection::Incoming;
 use loopal_ipc::protocol::methods;
 use serde_json::json;
 
@@ -25,20 +24,16 @@ async fn spawn_with_target_hub_reaches_metahub() {
     }
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
+    let error = send_agent_request(
         &hub_a,
+        "parent-agent",
         methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "remote-worker", "target_hub": "hub-b", "cwd": "/tmp"}),
-        "parent-agent".into(),
+        json!({"name": "remote-worker", "target_hub": "hub-b"}),
     )
-    .await;
+    .await
+    .expect_err("missing destination Hub must reject the spawn");
 
-    if let Ok(val) = &result {
-        assert!(
-            val.get("agent_id").is_none(),
-            "no agent_id without target hub: {val}"
-        );
-    }
+    assert!(error.to_string().contains("hub-b"), "got: {error}");
 }
 
 #[tokio::test]
@@ -48,26 +43,41 @@ async fn cross_hub_spawn_reaches_target_hub() {
     let (hub_b, _hub_b_event_rx) = make_hub();
     let hub_a_conn = wire_hub_to_meta("hub-a", &hub_a, &meta_hub).await;
     let _hub_b_conn = wire_hub_to_meta("hub-b", &hub_b, &meta_hub).await;
+    hub_b.lock().await.max_agent_depth = 0;
     {
         let ul = Arc::new(loopal_agent_hub::HubUplink::new(hub_a_conn, "hub-a".into()));
         hub_a.lock().await.uplink = Some(ul);
     }
-    tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let result = loopal_agent_hub::dispatch::dispatch_hub_request(
+    let error = send_agent_request(
         &hub_a,
+        "parent-agent",
         methods::HUB_SPAWN_AGENT.name,
-        json!({"name": "remote-worker", "target_hub": "hub-b", "cwd": "/tmp"}),
-        "parent-agent".into(),
+        json!({"name": "remote-worker", "target_hub": "hub-b"}),
     )
-    .await;
+    .await
+    .expect_err("target Hub must enforce its depth authority");
 
-    if let Err(e) = &result {
-        assert!(
-            e.contains("spawn") || e.contains("failed") || e.contains("No such file"),
-            "error from spawn, not routing: {e}"
-        );
-    }
+    assert!(
+        error.to_string().contains("depth limit exceeded"),
+        "got: {error}"
+    );
+    assert!(
+        hub_b
+            .lock()
+            .await
+            .registry
+            .agent_info("remote-worker")
+            .is_none()
+    );
+    assert!(
+        hub_a
+            .lock()
+            .await
+            .registry
+            .agent_info("remote-worker")
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -93,30 +103,20 @@ async fn completion_delivery_to_remote_parent() {
         hub_b.lock().await.uplink = Some(ul);
     }
 
-    let (child_client, child_server) = loopal_ipc::duplex_pair();
-    let (child_server_conn, child_server_rx) = Connection::new(child_server).into_listening();
-    let (child_client_conn, _child_client_rx) = Connection::new(child_client).into_listening();
-
-    let _ = register_agent_connection(
-        hub_b.clone(),
+    let (child_client_conn, _child_client_rx) = register_remote_agent(
+        &hub_b,
         "child-worker",
-        child_server_conn,
-        child_server_rx,
-        Some("hub-a/parent-agent"),
-        None,
-        None,
+        loopal_protocol::QualifiedAddress::remote(["hub-a"], "parent-agent"),
     )
     .await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let _ = child_client_conn
+    child_client_conn
         .send_notification(
             methods::AGENT_COMPLETED.name,
             json!({"reason": "error", "result": "partial remote result"}),
         )
-        .await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    drop(child_client_conn);
+        .await
+        .unwrap();
 
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         while let Some(msg) = parent_rx.recv().await {

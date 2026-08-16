@@ -1,40 +1,17 @@
 mod aggregate;
 mod bg;
 mod compact;
+mod effect;
 mod interactive;
 mod lifecycle;
 mod observable;
 mod question;
 mod stream;
 mod tool;
-
-use loopal_protocol::AgentEventPayload;
-
+mod workflow;
 use crate::state::SessionViewState;
-
-/// Outcome of a single mutator. Each mutator function returns one of these
-/// directly — there is no central "which event ends a turn" table. The
-/// mutator's domain logic decides the effect, and the reducer consumes it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MutationEffect {
-    /// Event was a no-op (unrecognised, duplicate, empty-id rejected).
-    NoOp,
-    /// State changed; no turn lifecycle implication.
-    Mutated,
-    /// State changed AND this mutator marks turn-end — reducer must
-    /// reconcile still-active tool invocations into terminal states.
-    MutatedEndedTurn,
-}
-
-impl MutationEffect {
-    pub fn changed(self) -> bool {
-        !matches!(self, Self::NoOp)
-    }
-
-    pub fn requires_turn_end_reconcile(self) -> bool {
-        matches!(self, Self::MutatedEndedTurn)
-    }
-}
+pub(crate) use effect::MutationEffect;
+use loopal_protocol::AgentEventPayload;
 
 pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) -> MutationEffect {
     use AgentEventPayload::*;
@@ -59,9 +36,18 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         ToolProgress {
             id, output_tail, ..
         } => tool::tool_progress(state, id, output_tail),
-        ToolPermissionRequest { id, name, input } => {
-            interactive::tool_permission_request(state, id, name, input)
-        }
+        ToolPermissionRequest {
+            id,
+            name,
+            input,
+            permission_intent,
+        } => interactive::tool_permission_request(
+            state,
+            id,
+            name,
+            input,
+            permission_intent.as_deref(),
+        ),
         ToolPermissionResolved { id } => interactive::tool_permission_resolved(state, id),
         PlanApprovalRequest {
             id,
@@ -183,6 +169,7 @@ pub(crate) fn mutate(state: &mut SessionViewState, event: &AgentEventPayload) ->
         SessionResumed { session_id, .. } => aggregate::session_resumed(state, session_id),
         SessionHistoryLoaded(history) => aggregate::session_history_loaded(state, history),
         ThreadGoalUpdated { goal, .. } => aggregate::thread_goal_updated(state, goal),
+        WorkflowRunChanged(summary) => workflow::workflow_changed(state, summary),
         HubDegraded { since_unix_ms } => aggregate::hub_degraded(state, *since_unix_ms),
         HubRecovered { .. } => aggregate::hub_recovered(state),
         MessageRouted { .. }

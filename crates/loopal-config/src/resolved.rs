@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use loopal_provider_api::ThinkingConfig;
 use loopal_vault_api::Vault;
 
 use crate::hook::HookConfig;
@@ -13,6 +14,8 @@ use crate::skills::Skill;
 pub struct ResolvedConfig {
     /// Deserialized settings (model, providers, sandbox, etc.)
     pub settings: Settings,
+    /// Preset recommendation kept outside serialized user settings.
+    pub workflow_preset_thinking_recommendation: Option<ThinkingConfig>,
     /// MCP servers keyed by name, with provenance
     pub mcp_servers: IndexMap<String, McpServerEntry>,
     /// Skills keyed by name, with provenance
@@ -43,6 +46,10 @@ impl std::fmt::Debug for ResolvedConfig {
             .field("instruction_bytes", &self.instructions.len())
             .field("memory_bytes", &self.memory.len())
             .field("has_classifier_prompt", &self.classifier_prompt.is_some())
+            .field(
+                "has_workflow_preset_thinking_recommendation",
+                &self.workflow_preset_thinking_recommendation.is_some(),
+            )
             .field("layer_count", &self.layers.len())
             .field("secrets", &self.secrets.is_some())
             .finish()
@@ -65,6 +72,7 @@ mod tests {
         });
         let resolved = ResolvedConfig {
             settings,
+            workflow_preset_thinking_recommendation: None,
             mcp_servers: Default::default(),
             skills: Default::default(),
             hooks: Vec::new(),

@@ -1,140 +1,136 @@
 use super::*;
 use crate::spawn_registry::SpawnRegistry;
+use crate::types::AgentExecutionRef;
 
 #[tokio::test]
 async fn provider_for_returns_same_instance_for_same_cwd() {
-    let svc = HubMcpService::new();
-    let tmp = tempfile::tempdir().unwrap();
-    let a = svc.provider_for(tmp.path()).await;
-    let b = svc.provider_for(tmp.path()).await;
-    assert!(Arc::ptr_eq(&a, &b));
+    let service = HubMcpService::new();
+    let temp = tempfile::tempdir().unwrap();
+    let first = service.provider_for(temp.path()).await;
+    let second = service.provider_for(temp.path()).await;
+    assert!(Arc::ptr_eq(&first, &second));
 }
 
 #[tokio::test]
 async fn provider_for_returns_different_instances_for_different_cwds() {
-    let svc = HubMcpService::new();
-    let a_dir = tempfile::tempdir().unwrap();
-    let b_dir = tempfile::tempdir().unwrap();
-    let a = svc.provider_for(a_dir.path()).await;
-    let b = svc.provider_for(b_dir.path()).await;
-    assert!(!Arc::ptr_eq(&a, &b));
+    let service = HubMcpService::new();
+    let first = service
+        .provider_for(tempfile::tempdir().unwrap().path())
+        .await;
+    let second = service
+        .provider_for(tempfile::tempdir().unwrap().path())
+        .await;
+    assert!(!Arc::ptr_eq(&first, &second));
 }
 
 #[tokio::test]
 async fn root_of_returns_none_without_registry() {
-    let svc = HubMcpService::new();
-    assert!(svc.root_of("anyone").is_none());
+    let service = HubMcpService::new();
+    assert!(
+        service
+            .root_of(&AgentExecutionRef::local("anyone", 1))
+            .is_none()
+    );
 }
 
 fn write_settings(dir: &std::path::Path, sharing_kind: &str) {
     let loopal_dir = dir.join(".loopal");
     std::fs::create_dir_all(&loopal_dir).unwrap();
-    let settings = format!(
-        r#"{{
-            "mcp_servers": {{
-                "test-server": {{
-                    "type": "stdio",
-                    "command": "/usr/bin/true",
-                    "args": [],
-                    "timeout_ms": 1000,
-                    "sharing": "{sharing_kind}"
+    std::fs::write(
+        loopal_dir.join("settings.json"),
+        format!(
+            r#"{{
+                "mcp_servers": {{
+                    "test-server": {{
+                        "type": "stdio",
+                        "command": "/usr/bin/true",
+                        "args": [],
+                        "timeout_ms": 1000,
+                        "sharing": "{sharing_kind}"
+                    }}
                 }}
-            }}
-        }}"#
-    );
-    std::fs::write(loopal_dir.join("settings.json"), settings).unwrap();
+            }}"#
+        ),
+    )
+    .unwrap();
 }
 
 #[tokio::test]
-async fn per_agent_provider_isolated_per_agent() {
+async fn per_agent_provider_isolated_by_exact_execution() {
     let dir = tempfile::tempdir().unwrap();
-    let canonical = dir.path().canonicalize().unwrap();
-    write_settings(&canonical, "per-agent");
-
+    let cwd = dir.path().canonicalize().unwrap();
+    write_settings(&cwd, "per-agent");
+    let first = AgentExecutionRef::local("agent-a", 1);
+    let second = AgentExecutionRef::local("agent-b", 2);
     let registry = Arc::new(SpawnRegistry::new());
-    registry.register("agent-a".into(), canonical.clone(), None);
-    registry.register("agent-b".into(), canonical.clone(), None);
+    assert!(registry.register_exact(first.clone(), cwd.clone(), None));
+    assert!(registry.register_exact(second.clone(), cwd.clone(), None));
+    let service = HubMcpService::new().with_spawn_registry(registry);
 
-    let svc = HubMcpService::new().with_spawn_registry(registry);
-    svc.on_agent_attach("agent-a".into(), canonical.clone(), None)
-        .await;
-    svc.on_agent_attach("agent-b".into(), canonical.clone(), None)
-        .await;
+    service.on_agent_attach(first.clone(), cwd.clone()).await;
+    service.on_agent_attach(second.clone(), cwd.clone()).await;
 
-    let per_agent = svc.per_agent.read().await;
-    assert!(per_agent.contains_key("agent-a"));
-    assert!(per_agent.contains_key("agent-b"));
+    let providers = service.per_agent.read().await;
+    assert!(providers.contains_key(&first));
+    assert!(providers.contains_key(&second));
     assert!(!Arc::ptr_eq(
-        per_agent.get("agent-a").unwrap(),
-        per_agent.get("agent-b").unwrap(),
+        providers.get(&first).unwrap(),
+        providers.get(&second).unwrap(),
     ));
 }
 
 #[tokio::test]
-async fn cwd_isolation_config_flows_from_settings_to_injected_args() {
+async fn stale_detach_does_not_remove_same_name_replacement() {
+    let dir = tempfile::tempdir().unwrap();
+    let cwd = dir.path().canonicalize().unwrap();
+    write_settings(&cwd, "per-agent");
+    let stale = AgentExecutionRef::local("agent", 1);
+    let current = AgentExecutionRef::local("agent", 2);
+    let registry = Arc::new(SpawnRegistry::new());
+    assert!(registry.register_exact(stale.clone(), cwd.clone(), None));
+    let service = HubMcpService::new().with_spawn_registry(registry.clone());
+    service.on_agent_attach(stale.clone(), cwd.clone()).await;
+    assert!(registry.register_exact(current.clone(), cwd.clone(), None));
+    service.on_agent_attach(current.clone(), cwd).await;
+
+    service.on_agent_detach(&stale).await;
+
+    let providers = service.per_agent.read().await;
+    assert!(!providers.contains_key(&stale));
+    assert!(providers.contains_key(&current));
+}
+
+#[tokio::test]
+async fn cwd_isolation_config_flows_to_injected_args() {
     use crate::mcp_service::cwd_isolation::inject;
     use crate::mcp_service::factory::load_servers_by_sharing;
     use loopal_config::McpSharing;
 
-    let dir_a = tempfile::tempdir().unwrap();
-    let dir_b = tempfile::tempdir().unwrap();
-    let canonical_a = dir_a.path().canonicalize().unwrap();
-    let canonical_b = dir_b.path().canonicalize().unwrap();
+    let first = tempfile::tempdir().unwrap();
+    let second = tempfile::tempdir().unwrap();
     let settings = r#"{
-        "mcp_servers": {
-            "chrome-mock": {
-                "type": "stdio",
-                "command": "/usr/bin/true",
-                "args": ["-y", "chrome-devtools-mcp@latest"],
-                "timeout_ms": 1000,
-                "sharing": "hub-singleton",
-                "cwd_isolation": {
-                    "arg": "--user-data-dir",
-                    "cache_subdir": "chrome-isolated"
-                }
-            }
-        }
+        "mcp_servers": {"chrome": {
+            "type": "stdio", "command": "/usr/bin/true",
+            "args": [], "timeout_ms": 1000, "sharing": "hub-singleton",
+            "cwd_isolation": {"arg": "--user-data-dir", "cache_subdir": "isolated"}
+        }}
     }"#;
-    for d in [&canonical_a, &canonical_b] {
-        let loopal = d.join(".loopal");
-        std::fs::create_dir_all(&loopal).unwrap();
-        std::fs::write(loopal.join("settings.json"), settings).unwrap();
+    for dir in [first.path(), second.path()] {
+        std::fs::create_dir_all(dir.join(".loopal")).unwrap();
+        std::fs::write(dir.join(".loopal/settings.json"), settings).unwrap();
     }
-
-    let servers_a = load_servers_by_sharing(&canonical_a, McpSharing::HubSingleton);
-    assert_eq!(servers_a.len(), 1);
-    let (name_a, cfg_a) = servers_a.into_iter().next().unwrap();
-    assert!(cfg_a.cwd_isolation().is_some());
-
-    let injected_a = inject(&name_a, cfg_a, &canonical_a);
-    let injected_b = inject(
-        &name_a,
-        load_servers_by_sharing(&canonical_b, McpSharing::HubSingleton)
+    let injected_args = |dir: &std::path::Path| {
+        let (name, config) = load_servers_by_sharing(dir, McpSharing::HubSingleton)
             .into_iter()
             .next()
-            .unwrap()
-            .1,
-        &canonical_b,
-    );
-
-    let args_a = match &injected_a {
-        loopal_config::McpServerConfig::Stdio { args, .. } => args.clone(),
-        _ => panic!("expected stdio"),
+            .unwrap();
+        match inject(&name, config, dir) {
+            loopal_config::McpServerConfig::Stdio { args, .. } => args,
+            _ => panic!("expected stdio"),
+        }
     };
-    let args_b = match &injected_b {
-        loopal_config::McpServerConfig::Stdio { args, .. } => args.clone(),
-        _ => panic!("expected stdio"),
-    };
-
-    let arg_a = args_a
-        .iter()
-        .find(|s| s.starts_with("--user-data-dir="))
-        .expect("injected --user-data-dir for cwd A");
-    let arg_b = args_b
-        .iter()
-        .find(|s| s.starts_with("--user-data-dir="))
-        .expect("injected --user-data-dir for cwd B");
-    assert_ne!(arg_a, arg_b);
-    assert!(arg_a.contains("chrome-isolated"));
-    assert!(arg_b.contains("chrome-isolated"));
+    let first_args = injected_args(first.path());
+    let second_args = injected_args(second.path());
+    assert_ne!(first_args, second_args);
+    assert!(first_args.iter().any(|arg| arg.contains("isolated")));
 }

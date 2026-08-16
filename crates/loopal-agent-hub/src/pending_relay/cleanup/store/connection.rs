@@ -39,7 +39,9 @@ pub(in crate::pending_relay::cleanup) fn take_for_agent_connection(
         Vec::with_capacity(permission_keys.len() + question_keys.len() + plan_keys.len());
     for key in permission_keys {
         if let Some(info) = hub.pending_permissions.remove(&key) {
-            pending.push(PendingInteraction::Permission { info });
+            pending.push(PendingInteraction::Permission {
+                info: Box::new(info),
+            });
         }
     }
     for key in question_keys {
@@ -72,7 +74,9 @@ pub(in crate::pending_relay::cleanup) fn take_by_request(
         .map(|(key, _)| key.clone());
     if let Some(key) = permission {
         let info = hub.pending_permissions.remove(&key)?;
-        return Some(PendingInteraction::Permission { info });
+        return Some(PendingInteraction::Permission {
+            info: Box::new(info),
+        });
     }
     let question = hub
         .pending_questions

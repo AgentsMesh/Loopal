@@ -15,7 +15,9 @@ pub(super) fn take_for_agent(hub: &mut Hub, agent_name: &str) -> Vec<PendingInte
     let permission_keys = keys_for_agent(&hub.pending_permissions, agent_name);
     for key in permission_keys {
         if let Some(info) = hub.pending_permissions.remove(&key) {
-            pending.push(PendingInteraction::Permission { info });
+            pending.push(PendingInteraction::Permission {
+                info: Box::new(info),
+            });
         }
     }
     let question_keys = keys_for_agent(&hub.pending_questions, agent_name);
@@ -54,7 +56,9 @@ pub(super) fn take_unavailable(
         let keys: Vec<_> = hub.pending_permissions.keys().cloned().collect();
         for key in keys {
             if let Some(info) = hub.pending_permissions.remove(&key) {
-                pending.push(PendingInteraction::Permission { info });
+                pending.push(PendingInteraction::Permission {
+                    info: Box::new(info),
+                });
             }
         }
     }
@@ -97,7 +101,9 @@ pub(super) fn take_if_generation(
             .is_some_and(|info| info.interaction_id == interaction_id)
             .then(|| hub.pending_permissions.remove(&key))
             .flatten()
-            .map(|info| PendingInteraction::Permission { info }),
+            .map(|info| PendingInteraction::Permission {
+                info: Box::new(info),
+            }),
         InteractionKind::Question => hub
             .pending_questions
             .get(&key)

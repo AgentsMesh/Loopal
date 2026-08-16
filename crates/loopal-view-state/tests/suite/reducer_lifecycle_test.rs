@@ -29,6 +29,7 @@ fn from_snapshot_starts_with_rev_one() {
         crons: vec![],
         bg_tasks: vec![],
         thread_goal: None,
+        workflows: Default::default(),
     };
     let r = ViewStateReducer::from_snapshot("root", snap);
     assert_eq!(r.rev(), 1);
@@ -126,6 +127,7 @@ fn cleared_event_drops_pending_permission_to_prevent_zombie_dialog() {
         id: "perm-1".into(),
         name: "Bash".into(),
         input: serde_json::json!({"command": "rm -rf /"}),
+        permission_intent: None,
     });
     assert!(
         r.state().agent.conversation.pending_permission.is_some(),

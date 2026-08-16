@@ -18,7 +18,7 @@ pub(super) enum CleanupReason {
 
 pub(super) enum PendingInteraction {
     Permission {
-        info: PendingPermissionInfo,
+        info: Box<PendingPermissionInfo>,
     },
     Question {
         id: String,
@@ -52,18 +52,21 @@ impl PendingInteraction {
         emit_resolved: bool,
     ) {
         let (agent_conn, agent_ipc_id, agent_name, response, event) = match self {
-            Self::Permission { info } => (
-                info.agent_conn,
-                info.agent_ipc_id,
-                info.agent_name.clone(),
-                serde_json::json!({"allow": false}),
-                AgentEvent::named(
-                    QualifiedAddress::local(&info.agent_name),
-                    AgentEventPayload::ToolPermissionResolved {
-                        id: info.interaction_id,
-                    },
-                ),
-            ),
+            Self::Permission { info } => {
+                let info = *info;
+                (
+                    info.agent_conn,
+                    info.agent_ipc_id,
+                    info.agent_name.clone(),
+                    serde_json::json!({"allow": false}),
+                    AgentEvent::named(
+                        QualifiedAddress::local(&info.agent_name),
+                        AgentEventPayload::ToolPermissionResolved {
+                            id: info.interaction_id,
+                        },
+                    ),
+                )
+            }
             Self::Question { id, info } => (
                 info.agent_conn,
                 info.agent_ipc_id,
@@ -125,3 +128,7 @@ pub(super) fn resolve_all(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "interaction_tests.rs"]
+mod tests;

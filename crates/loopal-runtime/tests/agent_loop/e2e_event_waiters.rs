@@ -182,7 +182,8 @@ fn turn_text_summary(turn: &loopal_turn::Turn) -> String {
         | TurnTrigger::AgentResult { content, .. }
         | TurnTrigger::Channel { content, .. }
         | TurnTrigger::GoalContinuation { content, .. }
-        | TurnTrigger::BackgroundHook { content, .. } => content.clone(),
+        | TurnTrigger::BackgroundHook { content, .. }
+        | TurnTrigger::WorkflowResult { content, .. } => content.clone(),
         TurnTrigger::Resume => String::new(),
     };
     for step in &turn.body.steps {

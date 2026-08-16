@@ -1,0 +1,127 @@
+use std::sync::Arc;
+
+use loopal_agent_hub::hub_server;
+use loopal_ipc::protocol::methods;
+use loopal_protocol::{
+    PermissionActionDigest, PermissionSchemaDigest, ProtectedEffectAuditRequest,
+};
+use loopal_vault_api::{AuditSink, ProtectedOp};
+
+use crate::protected_audit_support::{CapturingSink, connected, wait_registered};
+
+fn request() -> ProtectedEffectAuditRequest {
+    ProtectedEffectAuditRequest::new(
+        "call-1",
+        "Bash",
+        PermissionActionDigest::from_bytes([0x11; 32]),
+        PermissionSchemaDigest::from_bytes([0x22; 32]),
+    )
+    .unwrap()
+}
+
+async fn send(
+    agent: &loopal_ipc::Connection<loopal_ipc::Listening>,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, loopal_ipc::RpcError> {
+    agent
+        .send_request(methods::HUB_AUDIT_PROTECTED_EFFECT.name, params)
+        .await
+}
+
+#[tokio::test]
+async fn success_records_hub_derived_metadata_and_acknowledges() {
+    let sink = Arc::new(CapturingSink::new(false));
+    let fixture = connected(Some(sink.clone())).await;
+    let response = send(&fixture.agent, serde_json::to_value(request()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response, serde_json::json!({"recorded": true}));
+
+    let records = sink.records();
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record.op, ProtectedOp::ToolEffect);
+    assert_eq!(record.subject, "call-1");
+    assert_eq!(record.session_id, None);
+    let expected_cwd = fixture.cwd.path().canonicalize().unwrap();
+    assert_eq!(record.cwd.as_deref(), Some(expected_cwd.as_path()));
+    assert_eq!(record.agent_name.as_deref(), Some("worker"));
+    assert_eq!(record.depth, Some(0));
+    assert!(record.connection_generation.is_some());
+    assert_eq!(record.tool_name.as_deref(), Some("Bash"));
+    assert_eq!(record.tool_call_id.as_deref(), Some("call-1"));
+    let expected = request();
+    let action_digest = expected.action_digest().to_string();
+    let schema_digest = expected.schema_digest().to_string();
+    assert_eq!(
+        record.action_digest.as_deref(),
+        Some(action_digest.as_str())
+    );
+    assert_eq!(
+        record.schema_digest.as_deref(),
+        Some(schema_digest.as_str())
+    );
+}
+
+#[tokio::test]
+async fn missing_or_failing_sink_denies_ack() {
+    let missing = connected(None).await;
+    let error = send(&missing.agent, serde_json::to_value(request()).unwrap())
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("protected audit unavailable"));
+
+    let sink = Arc::new(CapturingSink::new(true));
+    let failing = connected(Some(sink.clone())).await;
+    let error = send(&failing.agent, serde_json::to_value(request()).unwrap())
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("protected audit failed"));
+    assert_eq!(sink.records().len(), 1);
+}
+
+#[tokio::test]
+async fn malformed_request_is_rejected_before_sink() {
+    let sink = Arc::new(CapturingSink::new(false));
+    let fixture = connected(Some(sink.clone())).await;
+    let mut params = serde_json::to_value(request()).unwrap();
+    params["action_input"] = serde_json::json!({"secret": "forbidden"});
+    let error = send(&fixture.agent, params).await.unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("invalid protected effect audit request")
+    );
+    assert!(sink.records().is_empty());
+}
+
+#[tokio::test]
+async fn generation_change_after_append_denies_ack() {
+    let (sink, gate) = CapturingSink::gated();
+    let sink = Arc::new(sink);
+    let fixture = connected(Some(sink.clone() as Arc<dyn AuditSink>)).await;
+    let old_agent = fixture.agent.clone();
+    let pending =
+        tokio::spawn(
+            async move { send(&old_agent, serde_json::to_value(request()).unwrap()).await },
+        );
+    gate.wait_started().await;
+
+    fixture
+        .hub
+        .lock()
+        .await
+        .registry
+        .unregister_connection("worker");
+    let (_new_agent, _incoming) = hub_server::connect_local(fixture.hub.clone(), "worker");
+    wait_registered(&fixture.hub, "worker").await;
+    gate.release();
+
+    let error = pending.await.unwrap().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("stale Agent connection after protected audit")
+    );
+    assert_eq!(sink.records().len(), 1);
+}

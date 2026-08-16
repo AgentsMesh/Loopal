@@ -1,8 +1,18 @@
+mod runner_custom_kernel;
 mod runner_support;
+mod runner_tracked_kernel;
+pub use runner_custom_kernel::make_runner_with_kernel;
 pub use runner_support::{
     in_turn, make_cancel, make_runner, make_runner_with_channels,
     make_runner_with_question_channel, make_test_budget, make_turn_ctx,
 };
+pub use runner_tracked_kernel::{
+    make_idle_runner_with_tracked_kernel, make_runner_with_tracked_kernel,
+};
+
+pub fn noop_protected_effect_audit() -> std::sync::Arc<dyn loopal_tool_api::ProtectedEffectAudit> {
+    std::sync::Arc::new(loopal_tool_api::NoopProtectedEffectAudit)
+}
 
 mod apply_patch_compact_rehydrate_e2e_test;
 mod apply_patch_partial_diff_e2e_test;
@@ -22,6 +32,9 @@ mod cron_e2e_test;
 mod degeneration_e2e_test;
 mod drain_pending_test;
 mod e2e_event_waiters;
+mod empty_tool_batch_test;
+mod enter_plan_rollback_emit_test;
+mod enter_plan_success_test;
 mod goal_e2e_test;
 mod goal_kickoff_edge_test;
 mod goal_kickoff_runner_test;
@@ -32,12 +45,16 @@ mod inbox_event_test;
 mod input_edge_test;
 mod input_emit_fail_edge_test;
 mod input_image_test;
+mod input_mcp_http_fixture;
 mod input_mcp_test;
 mod input_resources_test;
 mod input_scheduled_test;
 mod input_test;
 mod integration_test;
 mod interactive_cancel_test;
+mod llm_coverage_test;
+mod llm_entry_cancel_test;
+mod llm_params_branch_test;
 mod llm_test;
 mod llm_truncation_test;
 mod microcompact_e2e_test;
@@ -50,11 +67,15 @@ mod context_budget_test;
 mod continuation_bypass_test;
 mod dispatch_test;
 mod model_routing_test;
+mod params_builder_setters_test;
 mod params_builder_test;
+mod permission_audit_fail_closed_test;
 mod permission_serial_test;
 mod permission_test_ext;
 mod plan_approval_cancel_test;
 mod plan_mode_filter_test;
+mod plan_mode_outcomes_test;
+mod plan_mode_remaining_test;
 mod plan_mode_test;
 mod preflight_test;
 mod record_message_edge_test;
@@ -64,6 +85,7 @@ mod recovery_invariant_test;
 mod resume_invariant_test;
 mod resume_session_hook_test;
 mod retry_cancel_test;
+mod rewritten_sandbox_test;
 mod run_test;
 mod stream_idle_timeout_test;
 mod stream_partial_semantics_test;
@@ -73,6 +95,14 @@ mod suspend_cron_e2e_test;
 mod suspend_e2e_test;
 mod termination_reason_test;
 mod thinking_continue_test;
+mod thinking_switch_shared_test;
+mod tool_action_runner_test;
+mod tool_check_cancel_test;
+mod tool_result_correlation_test;
+mod tool_result_error_limit_test;
+mod tool_result_image_sink_test;
+mod tool_result_sink_e2e_test;
+mod tool_result_watchdog_test;
 mod tools_edit_safety_test;
 mod tools_test;
 pub mod try_recover_helpers;
@@ -80,3 +110,8 @@ mod try_recover_test;
 mod turn_completion_edge_test;
 mod turn_completion_test;
 mod turn_test;
+mod workflow_input_sequence_test;
+mod workflow_input_support;
+mod workflow_input_test;
+mod workflow_lease_lifecycle_test;
+mod workflow_permission_causation_test;

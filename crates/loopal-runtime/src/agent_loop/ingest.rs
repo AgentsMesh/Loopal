@@ -92,9 +92,59 @@ impl AgentLoopRunner {
 
         self.notify_observers_envelope_received(&env.source);
 
+        if matches!(env.source, loopal_protocol::MessageSource::Human)
+            && let Some(handler) = self.params.workflow_input_handler.clone()
+        {
+            let recent_context = recent_context(self.turns.view().messages());
+            match handler.handle(env, &recent_context).await {
+                Ok(loopal_runtime_disposition::WorkflowInputDisposition::Handled) => {
+                    self.end_turn_record(loopal_turn::TurnOutcome::Complete);
+                    return WaitResult::WorkflowHandled;
+                }
+                Ok(loopal_runtime_disposition::WorkflowInputDisposition::Direct) => {}
+                Err(error) => {
+                    tracing::error!(error = %error, "workflow input handler failed");
+                    let message = format!("workflow input handler failed: {error}");
+                    if let Err(emit_error) = self.transition_error(message.clone()).await {
+                        tracing::warn!(
+                            error = %emit_error,
+                            handler_error = %error,
+                            "failed to emit workflow input handler error"
+                        );
+                    }
+                    return WaitResult::WorkflowFailed(message);
+                }
+            }
+        }
+
         WaitResult::MessageAdded
     }
 }
+
+// Keep context provider-neutral and bounded. The planner receives only the
+// visible text projection, never tool metadata or transport authority.
+fn recent_context(messages: &[loopal_provider_api::Message]) -> String {
+    const MAX_MESSAGES: usize = 16;
+    const MAX_BYTES: usize = 8 * 1_024;
+    let mut out = String::new();
+    for message in messages.iter().rev().take(MAX_MESSAGES).rev() {
+        let role = match message.role {
+            loopal_provider_api::MessageRole::User => "user",
+            loopal_provider_api::MessageRole::Assistant => "assistant",
+            loopal_provider_api::MessageRole::System => "system",
+        };
+        let line = format!("{role}: {}\n", message.text_content());
+        if out.len().saturating_add(line.len()) > MAX_BYTES {
+            break;
+        }
+        out.push_str(&line);
+    }
+    out
+}
+
+// Alias keeps the match readable without importing the public module into
+// every ingest call site.
+use crate::workflow_input as loopal_runtime_disposition;
 
 fn extract_title(text: &str) -> String {
     let line = text.lines().next().unwrap_or("").trim();
@@ -106,3 +156,7 @@ fn extract_title(text: &str) -> String {
         head
     }
 }
+
+#[cfg(test)]
+#[path = "ingest_tests.rs"]
+mod tests;

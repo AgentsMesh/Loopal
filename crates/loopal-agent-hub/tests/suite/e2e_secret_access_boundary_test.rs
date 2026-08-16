@@ -24,20 +24,18 @@ async fn sub_agent_requesting_cwd_outside_spawn_tree_is_denied() {
     let (hub_conn, hub_rx) = Connection::new(hub_t).into_listening();
 
     let (event_tx, _event_rx) = mpsc::channel(64);
-    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-
     let dir_a = tempfile::tempdir().unwrap();
     let dir_b = tempfile::tempdir().unwrap();
+    let hub = Arc::new(Mutex::new(Hub::with_cwd(
+        event_tx,
+        dir_a.path().to_path_buf(),
+    )));
     let identity = test_identity_in(dir_a.path());
     let vault = HubVaultService::with_identity(identity, Arc::new(loopal_vault_api::NoopAuditSink));
 
-    hub.lock()
-        .await
-        .spawn_registry
-        .register("test-agent".into(), dir_a.path().to_path_buf(), None);
     hub.lock().await.set_vault_service(Arc::new(vault));
 
-    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "test-agent".into());
+    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "test-agent".into()).await;
 
     let client = HubSecretClient::new(
         client_conn,
@@ -67,19 +65,17 @@ async fn agent_requesting_own_cwd_is_allowed_through_verify_caller() {
     let (hub_conn, hub_rx) = Connection::new(hub_t).into_listening();
 
     let (event_tx, _event_rx) = mpsc::channel(64);
-    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-
     let dir = tempfile::tempdir().unwrap();
+    let hub = Arc::new(Mutex::new(Hub::with_cwd(
+        event_tx,
+        dir.path().to_path_buf(),
+    )));
     let identity = test_identity_in(dir.path());
     let vault = HubVaultService::with_identity(identity, Arc::new(loopal_vault_api::NoopAuditSink));
 
-    hub.lock()
-        .await
-        .spawn_registry
-        .register("self-agent".into(), dir.path().to_path_buf(), None);
     hub.lock().await.set_vault_service(Arc::new(vault));
 
-    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "self-agent".into());
+    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "self-agent".into()).await;
 
     let client = HubSecretClient::new(
         client_conn,

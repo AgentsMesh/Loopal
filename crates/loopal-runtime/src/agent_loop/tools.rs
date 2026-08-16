@@ -1,12 +1,10 @@
 use std::collections::HashSet;
 
 use loopal_error::Result;
-use loopal_provider_api::ContentBlock;
 use tracing::info;
 
 use super::runner::AgentLoopRunner;
 use super::streaming_tool_exec::StreamingToolHandle;
-use super::tools_phase::count_errors;
 use super::turn_context::TurnContext;
 use super::turn_metrics::ToolExecStats;
 
@@ -17,31 +15,24 @@ impl AgentLoopRunner {
         tool_uses: Vec<(String, String, serde_json::Value)>,
         early_handle: StreamingToolHandle,
     ) -> Result<ToolExecStats> {
-        // reason: open the ToolBatch step up-front with full ToolCall info so
-        // subsequent finalize/intercept paths only need to patch item state via
-        // StepUpdated — no placeholder fields, no second batch step. Failure
-        // here (e.g. no current turn) is logged but execution continues so
-        // tests that bypass ingest_message still drive the tool pipeline;
-        // the result is that turns.jsonl misses the ToolBatch step while
-        // messages.jsonl still records the tool_result.
-        if let Err(e) = self.start_tool_batch_record(&tool_uses) {
-            tracing::warn!(error = %e, "start_tool_batch_record failed; turn log will miss this batch");
+        if let Err(error) = self.start_tool_batch_record(&tool_uses) {
+            tracing::warn!(%error, "start_tool_batch_record failed; turn log will miss this batch");
         }
 
         if turn_ctx.cancel.is_cancelled() {
             early_handle.discard();
-            self.emit_all_interrupted(&tool_uses).await?;
+            let interrupted = self.all_interrupted(&tool_uses);
+            self.finalize_tool_results(interrupted).await?;
             return Ok(ToolExecStats::default());
         }
 
         let (intercepted, remaining) = self.intercept_special_tools(turn_ctx, &tool_uses).await?;
         let intercepted_indices: HashSet<usize> = intercepted.iter().map(|(idx, _)| *idx).collect();
-
-        let early_ids = early_handle.early_started_ids().clone();
-        let non_early: Vec<(String, String, serde_json::Value)> = remaining
+        let early_ids = early_handle.early_started_ids();
+        let non_early = remaining
             .into_iter()
             .filter(|(id, _, _)| !early_ids.contains(id))
-            .collect();
+            .collect::<Vec<_>>();
 
         info!(
             non_early = non_early.len(),
@@ -56,33 +47,27 @@ impl AgentLoopRunner {
             denied = check.denied.len(),
             "check_tools done"
         );
-
         let mut stats = ToolExecStats {
             approved: check.approved.len() as u32 + early_ids.len() as u32,
             denied: check.denied.len() as u32,
             errors: 0,
         };
 
-        let mut indexed_results: Vec<(usize, ContentBlock)> = Vec::new();
-        indexed_results.extend(intercepted);
-        indexed_results.extend(check.denied);
-
-        let parallel = self
-            .run_approved_batch(check.approved, &tool_uses, &turn_ctx.cancel)
-            .await?;
-        indexed_results.extend(parallel);
-
-        let early_results = early_handle.take_results().await;
-        indexed_results.extend(
-            early_results
-                .into_iter()
-                .filter(|(idx, _)| !intercepted_indices.contains(idx)),
+        let mut pending = intercepted;
+        pending.extend(check.denied);
+        pending.extend(
+            self.run_approved_batch(check.approved, &tool_uses, &turn_ctx.cancel)
+                .await?,
         );
-
-        self.wrap_plan_results(&mut indexed_results, &intercepted_indices);
-        stats.errors = count_errors(&indexed_results);
-
-        self.finalize_tool_results(indexed_results)?;
+        pending.extend(
+            early_handle
+                .take_results()
+                .await
+                .into_iter()
+                .filter(|(index, _)| !intercepted_indices.contains(index)),
+        );
+        self.wrap_plan_results(&mut pending, &intercepted_indices);
+        stats.errors = self.finalize_tool_results(pending).await?;
         Ok(stats)
     }
 }

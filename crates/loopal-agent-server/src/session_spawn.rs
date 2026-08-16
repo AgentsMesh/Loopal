@@ -9,7 +9,7 @@ use loopal_runtime::agent_loop;
 use loopal_scheduler::CronScheduler;
 use loopal_tool_background::{BackgroundTaskStore, SpawnNotification};
 use tokio::sync::{broadcast, oneshot};
-use tokio::task::JoinHandle;
+use tokio::task::{AbortHandle, JoinHandle};
 use tracing::info;
 
 use crate::hub_frontend::HubFrontend;
@@ -32,14 +32,77 @@ pub(crate) fn parse_start_params(
     let lifecycle = match params["lifecycle"].as_str() {
         Some("ephemeral") => loopal_runtime::LifecycleMode::Ephemeral,
         Some("persistent") => loopal_runtime::LifecycleMode::Persistent,
+        Some("workflow_ephemeral") => loopal_runtime::LifecycleMode::WorkflowEphemeral,
         Some(unknown) => {
             anyhow::bail!(
-                "unknown lifecycle mode: '{unknown}' (expected 'ephemeral' or 'persistent')"
+                "unknown lifecycle mode: '{unknown}' (expected 'ephemeral', 'persistent', or 'workflow_ephemeral')"
             );
         }
         None if params["prompt"].as_str().is_some() => loopal_runtime::LifecycleMode::Ephemeral,
         None => loopal_runtime::LifecycleMode::Persistent,
     };
+
+    let no_sandbox = params["no_sandbox"].as_bool().unwrap_or(false);
+    let sandbox_policy = match params.get("sandbox_policy") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("sandbox_policy must be a string"))?
+                .parse::<loopal_config::SandboxPolicy>()
+                .map_err(anyhow::Error::msg)?,
+        ),
+    };
+    if no_sandbox
+        && sandbox_policy.is_some_and(|policy| policy != loopal_config::SandboxPolicy::Disabled)
+    {
+        anyhow::bail!("no_sandbox conflicts with sandbox_policy");
+    }
+
+    let session_id = match params.get("session_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(value)) => Some(
+            uuid::Uuid::parse_str(value)
+                .map_err(|_| anyhow::anyhow!("session_id must be a UUID"))?,
+        ),
+        Some(_) => anyhow::bail!("session_id must be a string"),
+    };
+
+    let workflow_permission_causation = match params.get("workflow_permission_causation") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => {
+            let causation: loopal_protocol::WorkflowPermissionCausation =
+                serde_json::from_value(value.clone())
+                    .map_err(|_| anyhow::anyhow!("invalid workflow permission causation"))?;
+            if !causation.is_valid() {
+                anyhow::bail!("invalid workflow permission causation");
+            }
+            Some(causation)
+        }
+    };
+    let workflow_attempt_capability = match params.get("workflow_attempt_capability") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => Some(
+            serde_json::from_value(value.clone())
+                .map_err(|_| anyhow::anyhow!("invalid workflow attempt capability"))?,
+        ),
+    };
+    let workflow_completion_result_limit = match params.get("workflow_completion_result_limit") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => {
+            let value = value
+                .as_u64()
+                .and_then(|value| u32::try_from(value).ok())
+                .filter(|value| *value > 0 && *value <= loopal_protocol::MAX_WORKFLOW_OUTPUT_BYTES)
+                .ok_or_else(|| anyhow::anyhow!("invalid workflow completion result limit"))?;
+            Some(value)
+        }
+    };
+    if workflow_attempt_capability.is_some() != workflow_permission_causation.is_some()
+        || workflow_completion_result_limit.is_some() != workflow_permission_causation.is_some()
+    {
+        anyhow::bail!("workflow authority and completion result limit must be supplied together");
+    }
 
     let start = StartParams {
         cwd: cwd_str,
@@ -48,7 +111,12 @@ pub(crate) fn parse_start_params(
         prompt: params["prompt"].as_str().map(String::from),
         permission_mode: params["permission_mode"].as_str().map(String::from),
         decision_mode: params["decision_mode"].as_str().map(String::from),
-        no_sandbox: params["no_sandbox"].as_bool().unwrap_or(false),
+        no_sandbox,
+        sandbox_policy,
+        session_id,
+        workflow_permission_causation,
+        workflow_attempt_capability,
+        workflow_completion_result_limit,
         resume: params["resume"].as_str().map(String::from),
         lifecycle,
         agent_type: params["agent_type"].as_str().map(String::from),
@@ -93,17 +161,32 @@ pub(crate) fn spawn_agent_and_bridges(
     tokio::spawn(async move {
         let result = agent_task.await;
         let _ = bridge_shutdown_tx.send(());
-        // reason: graceful first — let bridge drain BgTaskCompleted events
-        // that may still be in flight. Fall back to abort if it takes too
-        // long, to avoid leaking the task indefinitely.
-        if tokio::time::timeout(BRIDGE_SHUTDOWN_GRACE, bridge_task)
-            .await
-            .is_err()
-        {
-            bridge_abort.abort();
-        }
+        stop_background_bridge(bridge_task, bridge_abort).await;
         task_bridge_abort.abort();
         cron_bridge_abort.abort();
         result.ok().flatten()
     })
 }
+
+// Graceful first: let the bridge drain completed events that may still be in
+// flight, then abort so a stuck monitor cannot outlive the agent.
+async fn stop_background_bridge(bridge_task: JoinHandle<()>, bridge_abort: AbortHandle) {
+    if tokio::time::timeout(BRIDGE_SHUTDOWN_GRACE, bridge_task)
+        .await
+        .is_err()
+    {
+        bridge_abort.abort();
+    }
+}
+
+#[cfg(test)]
+#[path = "session_spawn/parse_tests.rs"]
+mod parse_tests;
+
+#[cfg(test)]
+#[path = "session_spawn/parse_completion_limit_tests.rs"]
+mod parse_completion_limit_tests;
+
+#[cfg(test)]
+#[path = "session_spawn/bridge_shutdown_tests.rs"]
+mod bridge_shutdown_tests;

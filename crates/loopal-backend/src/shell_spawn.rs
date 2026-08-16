@@ -6,28 +6,40 @@ use loopal_config::ResolvedPolicy;
 use loopal_error::ToolIoError;
 use loopal_protocol::META_HUB_TOKEN_ENV;
 use loopal_tool_api::backend_types::EnvOverride;
-use loopal_tool_api::output_tail::OutputTail;
-use loopal_tool_api::{HeadTail, StderrCappedBuffer};
-use parking_lot::Mutex as PlMutex;
+use loopal_tool_api::{OutputTail, ProcessOutputSanitizer};
 use tokio::process::{ChildStderr, ChildStdout, Command};
-use tokio::task::JoinHandle;
 
-use crate::log_writer::{LineSink, LogWriter, create_log_file, read_lines_into_sink};
-use crate::process_group::{SpawnedChild, capture_pgid, configure_process_group};
+use crate::log_writer::{LogWriter, create_log_file};
+use crate::process_capture;
+use crate::process_capture_state::ProcessCaptureState;
+use crate::process_capture_task::ProcessCaptureTask;
+use crate::process_group::SpawnedChild;
 
 pub(crate) const HEAD_LINES: usize = 25;
 pub(crate) const TAIL_LINES: usize = 25;
 
+pub(crate) struct CapturePolicy<'a> {
+    pub(crate) session_id: &'a str,
+    pub(crate) sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+}
+
+impl<'a> CapturePolicy<'a> {
+    pub(crate) fn new(
+        session_id: &'a str,
+        sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+    ) -> Self {
+        Self {
+            session_id,
+            sanitizer,
+        }
+    }
+}
+
 pub struct SpawnedBackgroundData {
     pub spawned: SpawnedChild,
     pub log_path: std::path::PathBuf,
-    pub head_tail: Arc<HeadTail>,
-    pub stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-    /// Owns the reader tasks. The monitor awaits these on natural child
-    /// exit so `head_tail`/`log_path` are fully populated before the task
-    /// is marked terminal — fixes the race where `bg_output` could return
-    /// a half-read preview.
-    pub drainers: Vec<JoinHandle<()>>,
+    pub capture_state: Arc<ProcessCaptureState>,
+    pub capture_task: ProcessCaptureTask,
 }
 
 pub(crate) struct PreparedSpawn {
@@ -36,8 +48,7 @@ pub(crate) struct PreparedSpawn {
     pub stderr_pipe: Option<ChildStderr>,
     pub log_path: std::path::PathBuf,
     pub log_writer: Arc<LogWriter>,
-    pub head_tail: Arc<HeadTail>,
-    pub stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
+    pub capture_state: Arc<ProcessCaptureState>,
 }
 
 pub(crate) async fn prepare_spawn(
@@ -45,73 +56,59 @@ pub(crate) async fn prepare_spawn(
     policy: Option<&ResolvedPolicy>,
     command: &str,
     env_overrides: &EnvOverride,
-    session_id: &str,
+    capture: &CapturePolicy<'_>,
 ) -> Result<PreparedSpawn, ToolIoError> {
+    let (log_path, log_writer) = create_log_file(capture.session_id).await?;
+    let capture_state = ProcessCaptureState::new(log_path.clone(), capture.sanitizer.clone());
     let (program, args, env) = build_command(cwd, policy, command);
     let mut cmd = Command::new(&program);
     cmd.args(&args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
+        .stderr(Stdio::piped());
     if let Some(env_map) = env {
         cmd.env_clear();
-        for (k, v) in env_map {
-            cmd.env(k, v);
+        for (key, value) in env_map {
+            cmd.env(key, value);
         }
     }
-    for (k, v) in &env_overrides.vars {
-        cmd.env(k, v);
+    for (key, value) in &env_overrides.vars {
+        cmd.env(key, value);
     }
     cmd.env_remove(META_HUB_TOKEN_ENV);
-    configure_process_group(&mut cmd);
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| ToolIoError::ExecFailed(format!("spawn failed: {e}")))?;
-    let pgid = capture_pgid(&child);
-    let stdout_pipe = child.stdout.take();
-    let stderr_pipe = child.stderr.take();
-
-    let (log_path, log_writer) = create_log_file(session_id).await?;
+    let mut spawned = SpawnedChild::spawn(cmd)
+        .map_err(|error| ToolIoError::ExecFailed(format!("spawn failed: {error}")))?;
+    let stdout_pipe = spawned.take_stdout();
+    let stderr_pipe = spawned.take_stderr();
     Ok(PreparedSpawn {
-        spawned: SpawnedChild { child, pgid },
+        spawned,
         stdout_pipe,
         stderr_pipe,
         log_path,
         log_writer: Arc::new(log_writer),
-        head_tail: Arc::new(HeadTail::new(HEAD_LINES, TAIL_LINES)),
-        stderr_buf: Arc::new(PlMutex::new(StderrCappedBuffer::new())),
+        capture_state,
     })
 }
 
-pub(crate) fn spawn_readers(
-    stdout_pipe: Option<ChildStdout>,
-    stderr_pipe: Option<ChildStderr>,
-    log_writer: Arc<LogWriter>,
-    head_tail: Arc<HeadTail>,
-    stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
-    progress_tail: Option<Arc<OutputTail>>,
-) -> Vec<JoinHandle<()>> {
-    let mut handles = Vec::new();
-    if let Some(pipe) = stdout_pipe {
-        let writer = log_writer.clone();
-        let ht = head_tail;
-        let tail = progress_tail.clone();
-        handles.push(tokio::spawn(async move {
-            read_lines_into_sink(pipe, writer, LineSink::Stdout(ht), tail).await
-        }));
-    }
-    if let Some(pipe) = stderr_pipe {
-        let writer = log_writer;
-        let sb = stderr_buf;
-        let tail = progress_tail;
-        handles.push(tokio::spawn(async move {
-            read_lines_into_sink(pipe, writer, LineSink::Stderr(sb), tail).await
-        }));
-    }
-    handles
+pub(crate) fn spawn_capture(
+    prepared: &mut PreparedSpawn,
+    progress: Option<Arc<OutputTail>>,
+    sanitizer: Option<Arc<dyn ProcessOutputSanitizer>>,
+) -> ProcessCaptureTask {
+    process_capture::spawn(
+        prepared.stdout_pipe.take(),
+        prepared.stderr_pipe.take(),
+        prepared.log_writer.clone(),
+        prepared.capture_state.clone(),
+        progress,
+        sanitizer,
+    )
 }
+
+#[cfg(test)]
+#[path = "shell_spawn_tests.rs"]
+mod tests;
 
 type EnvMap = std::collections::HashMap<String, String>;
 
@@ -120,11 +117,11 @@ pub(crate) fn build_command(
     policy: Option<&ResolvedPolicy>,
     command: &str,
 ) -> (String, Vec<String>, Option<EnvMap>) {
-    if let Some(pol) = policy {
-        let sc = loopal_sandbox::command_wrapper::wrap_command(pol, command, cwd);
-        (sc.program, sc.args, Some(sc.env))
+    if let Some(policy) = policy {
+        let command = loopal_sandbox::command_wrapper::wrap_command(policy, command, cwd);
+        (command.program, command.args, Some(command.env))
     } else if cfg!(windows) {
-        let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into());
+        let comspec = std::env::var("COMSPEC").unwrap_or("cmd.exe".into());
         (comspec, vec!["/C".into(), command.into()], None)
     } else {
         ("sh".into(), vec!["-c".into(), command.into()], None)

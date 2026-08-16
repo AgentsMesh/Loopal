@@ -15,16 +15,30 @@ mod fetch_headers_test;
 mod glob_parallel_test;
 #[path = "suite/image_test.rs"]
 mod image_test;
+#[path = "suite/local_process_coverage_test.rs"]
+mod local_process_coverage_test;
 #[path = "suite/log_file_test.rs"]
 mod log_file_test;
 #[path = "suite/log_file_test_support.rs"]
 mod log_file_test_support;
+#[path = "suite/log_guard_support.rs"]
+mod log_guard_support;
+#[path = "suite/log_guard_test.rs"]
+mod log_guard_test;
+#[path = "suite/log_permissions_test.rs"]
+mod log_permissions_test;
 #[path = "suite/path_approval_test.rs"]
 mod path_approval_test;
 #[path = "suite/process_group_test.rs"]
 mod process_group_test;
+#[path = "suite/process_group_windows_test.rs"]
+mod process_group_windows_test;
+#[path = "suite/process_test_support.rs"]
+mod process_test_support;
 #[path = "suite/resolve_checked_test.rs"]
 mod resolve_checked_test;
+#[path = "suite/search_coverage_test.rs"]
+mod search_coverage_test;
 #[path = "suite/search_timeout_test.rs"]
 mod search_timeout_test;
 #[path = "suite/secret_env_test.rs"]

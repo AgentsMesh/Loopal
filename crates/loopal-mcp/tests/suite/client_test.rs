@@ -21,7 +21,7 @@ async fn connect_mock(tools: Vec<(&str, &str, serde_json::Value)>) -> McpClient 
 async fn test_connect_and_peer_info() {
     let client = connect_mock(vec![]).await;
     let info = client.peer_info().expect("should have peer info");
-    assert_eq!(info.server_info.name, "mock");
+    assert_eq!(info.server_info.name, "MCP server");
     assert!(!client.is_closed());
 }
 

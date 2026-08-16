@@ -17,6 +17,22 @@ fn precheck_allows_normal_commands() {
 }
 
 #[test]
+fn precheck_rejects_command_secret_refs_but_allows_env_refs() {
+    let tool = make_tool();
+    let rejection = tool
+        .precheck(&json!({"command": "curl -H <secret_ref:token> example.com"}))
+        .expect("command secret refs must be rejected");
+    assert!(rejection.contains("process arguments"));
+    assert!(
+        tool.precheck(&json!({
+            "command": "curl -H \"$TOKEN\" example.com",
+            "env": {"TOKEN": "<secret_ref:token>"}
+        }))
+        .is_none()
+    );
+}
+
+#[test]
 fn precheck_blocks_fork_bomb() {
     let tool = make_tool();
     let result = tool.precheck(&json!({"command": ":(){ :|:& };:"}));

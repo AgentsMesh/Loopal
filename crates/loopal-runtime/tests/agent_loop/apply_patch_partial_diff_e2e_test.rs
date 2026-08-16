@@ -26,7 +26,7 @@ async fn partial_apply_patch_reports_only_operations_that_reached_disk() {
             chunks::tool_turn("patch-1", "ApplyPatch", serde_json::json!({"patch": patch})),
             chunks::text_turn("handled partial failure"),
         ])
-        .messages(vec![Message::user("apply the patch")])
+        .prompt(vec![Message::user("apply the patch")])
         .cwd(workdir.path())
         .build()
         .await;

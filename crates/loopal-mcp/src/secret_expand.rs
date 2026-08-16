@@ -1,102 +1,117 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use loopal_config::McpServerConfig;
 use loopal_ipc::IpcBudget;
-use loopal_secret_client::SecretClient;
-use loopal_secret_runtime::expand_to_plaintext;
+use loopal_secret_client::{AUTHOR_RE, SecretClient, SecretString, WIRE_RE, collect_names};
 
-pub async fn expand_mcp_config(
+use crate::resolved_config::ResolvedMcpConfig;
+use crate::secret_provenance::SecretProvenance;
+
+pub const CONFIG_SECRET_ERROR: &str = "MCP server secret configuration unavailable";
+
+pub(crate) async fn expand_mcp_config(
     config: McpServerConfig,
-    store: Option<&Arc<dyn SecretClient>>,
+    client: Option<&Arc<dyn SecretClient>>,
+    provenance: &SecretProvenance,
     budget: IpcBudget,
-) -> McpServerConfig {
-    let Some(store) = store else {
-        warn_if_placeholders_unresolved(&config);
-        return config;
-    };
-    let v = store.as_ref();
-    match config {
+) -> Result<ResolvedMcpConfig, &'static str> {
+    let seed = resolve_bound_mcp_secret_seed(&config, client, provenance, budget).await?;
+    Ok(ResolvedMcpConfig::from_config(config, &seed))
+}
+
+pub(crate) async fn resolve_bound_mcp_secret_seed(
+    config: &McpServerConfig,
+    client: Option<&Arc<dyn SecretClient>>,
+    provenance: &SecretProvenance,
+    budget: IpcBudget,
+) -> Result<Vec<(String, SecretString)>, &'static str> {
+    let seed = resolve_mcp_secret_seed(config, client, budget).await?;
+    provenance.establish(&seed)?;
+    Ok(seed)
+}
+
+pub(crate) async fn resolve_mcp_secret_seed(
+    config: &McpServerConfig,
+    client: Option<&Arc<dyn SecretClient>>,
+    budget: IpcBudget,
+) -> Result<Vec<(String, SecretString)>, &'static str> {
+    reject_ineligible_fields(config)?;
+    reject_wire_placeholders(config)?;
+    let names = eligible_names(config);
+    if names.is_empty() {
+        return Ok(Vec::new());
+    }
+    let client = client.ok_or(CONFIG_SECRET_ERROR)?;
+    fetch_seed(names, client.as_ref(), budget).await
+}
+
+fn reject_ineligible_fields(config: &McpServerConfig) -> Result<(), &'static str> {
+    let invalid = match config {
         McpServerConfig::Stdio {
             command,
             args,
             env,
-            enabled,
-            timeout_ms,
-            sharing,
             cwd_isolation,
-        } => McpServerConfig::Stdio {
-            command: expand_to_plaintext(&command, v, budget).await,
-            args: expand_vec(args, v, budget).await,
-            env: expand_map(env, v, budget).await,
-            enabled,
-            timeout_ms,
-            sharing,
-            cwd_isolation,
-        },
-        McpServerConfig::StreamableHttp {
-            url,
-            headers,
-            enabled,
-            timeout_ms,
-            sharing,
-        } => McpServerConfig::StreamableHttp {
-            url: expand_to_plaintext(&url, v, budget).await,
-            headers: expand_map(headers, v, budget).await,
-            enabled,
-            timeout_ms,
-            sharing,
-        },
-    }
-}
-
-async fn expand_vec(items: Vec<String>, v: &dyn SecretClient, budget: IpcBudget) -> Vec<String> {
-    let mut out = Vec::with_capacity(items.len());
-    for s in items {
-        out.push(expand_to_plaintext(&s, v, budget).await);
-    }
-    out
-}
-
-async fn expand_map(
-    map: HashMap<String, String>,
-    v: &dyn SecretClient,
-    budget: IpcBudget,
-) -> HashMap<String, String> {
-    let mut out = HashMap::with_capacity(map.len());
-    for (k, val) in map {
-        out.insert(k, expand_to_plaintext(&val, v, budget).await);
-    }
-    out
-}
-
-/// Diagnostic: when no vault is configured but the MCP server config still
-/// contains `{{secret:...}}` placeholders, the server will receive the
-/// literal placeholder string. That's almost always a misconfiguration —
-/// warn the user once so the failure isn't silent.
-fn warn_if_placeholders_unresolved(config: &McpServerConfig) {
-    let placeholder = "{{secret:";
-    let (name, unresolved) = match config {
-        McpServerConfig::Stdio {
-            command, args, env, ..
+            ..
         } => {
-            let in_command = command.contains(placeholder);
-            let in_args = args.iter().any(|a| a.contains(placeholder));
-            let in_env = env.values().any(|v| v.contains(placeholder));
-            ("stdio", in_command || in_args || in_env)
+            contains_placeholder(command)
+                || args.iter().any(|value| contains_placeholder(value))
+                || env.keys().any(|key| contains_placeholder(key))
+                || cwd_isolation.as_ref().is_some_and(|isolation| {
+                    contains_placeholder(&isolation.arg)
+                        || isolation
+                            .cache_subdir
+                            .as_deref()
+                            .is_some_and(contains_placeholder)
+                })
         }
         McpServerConfig::StreamableHttp { url, headers, .. } => {
-            let in_url = url.contains(placeholder);
-            let in_headers = headers.values().any(|v| v.contains(placeholder));
-            ("streamable-http", in_url || in_headers)
+            contains_placeholder(url) || headers.keys().any(|key| contains_placeholder(key))
         }
     };
-    if unresolved {
-        tracing::warn!(
-            transport = name,
-            "MCP server config references {{secret:...}} placeholders but no \
-             vault is configured — the server will receive the literal \
-             placeholder string. Configure a vault or remove the placeholders."
-        );
+    (!invalid).then_some(()).ok_or(CONFIG_SECRET_ERROR)
+}
+
+fn reject_wire_placeholders(config: &McpServerConfig) -> Result<(), &'static str> {
+    let invalid = match config {
+        McpServerConfig::Stdio { env, .. } => env.values().any(|value| WIRE_RE.is_match(value)),
+        McpServerConfig::StreamableHttp { headers, .. } => {
+            headers.values().any(|value| WIRE_RE.is_match(value))
+        }
+    };
+    (!invalid).then_some(()).ok_or(CONFIG_SECRET_ERROR)
+}
+
+fn eligible_names(config: &McpServerConfig) -> Vec<String> {
+    let values: Box<dyn Iterator<Item = &String> + '_> = match config {
+        McpServerConfig::Stdio { env, .. } => Box::new(env.values()),
+        McpServerConfig::StreamableHttp { headers, .. } => Box::new(headers.values()),
+    };
+    let mut names = Vec::new();
+    for value in values {
+        names.extend(collect_names(&AUTHOR_RE, value));
     }
+    names.sort();
+    names.dedup();
+    names
+}
+
+async fn fetch_seed(
+    names: Vec<String>,
+    client: &dyn SecretClient,
+    budget: IpcBudget,
+) -> Result<Vec<(String, SecretString)>, &'static str> {
+    let mut seed = Vec::with_capacity(names.len());
+    for name in names {
+        let value = client
+            .get(&name, budget)
+            .await
+            .map_err(|_| CONFIG_SECRET_ERROR)?;
+        seed.push((name, value));
+    }
+    Ok(seed)
+}
+
+fn contains_placeholder(value: &str) -> bool {
+    AUTHOR_RE.is_match(value) || WIRE_RE.is_match(value)
 }

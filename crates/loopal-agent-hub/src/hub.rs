@@ -6,6 +6,7 @@ use std::time::Duration;
 use tokio::sync::{Mutex, Notify, mpsc};
 
 use loopal_hub_vault::HubVaultService;
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::{AgentCompletion, AgentEvent, DEFAULT_INTERACTION_LIFETIME, Envelope};
 
 use crate::agent_registry::AgentRegistry;
@@ -13,9 +14,12 @@ use crate::mcp_service::HubMcpService;
 use crate::pending_relay::{
     PendingPermissionInfo, PendingPlanApprovalInfo, PendingQuestionInfo, PendingRemoteQuestionInfo,
 };
+use crate::permission_receipts::PermissionReceiptRegistry;
 use crate::spawn_registry::SpawnRegistry;
+use crate::types::SpawnAuthority;
 use crate::ui_dispatcher::UiDispatcher;
 use crate::uplink::HubUplink;
+use crate::workflow::WorkflowCoordinatorHandle;
 
 pub struct Hub {
     pub registry: AgentRegistry,
@@ -24,8 +28,11 @@ pub struct Hub {
     pub listener_port: Option<u16>,
     pub listener_token: Option<String>,
     pub max_total_agents: u32,
+    pub max_agent_depth: u32,
     pub default_cwd: PathBuf,
+    root_spawn_authority: SpawnAuthority,
     pub spawn_registry: Arc<SpawnRegistry>,
+    pub protected_audit: Option<Arc<dyn loopal_vault_api::AuditSink>>,
     pub vault_service: Option<Arc<HubVaultService>>,
     pub mcp_service: Arc<HubMcpService>,
     pub pending_permissions: HashMap<(String, String), PendingPermissionInfo>,
@@ -46,10 +53,13 @@ pub struct Hub {
     /// recover remote questions after UI lag/reconnect.
     pub remote_views: HashMap<String, Arc<Mutex<loopal_view_state::ViewStateReducer>>>,
     pending_interaction_timeout: Duration,
-    pub session_permission_grants: HashSet<(String, String)>,
+    pub(crate) session_permission_grants: HashSet<crate::permission_grants::PermissionGrantKey>,
+    pub(crate) permission_receipts: PermissionReceiptRegistry,
     pub shutdown_signal: Arc<Notify>,
+    workflow_coordinator: Option<WorkflowCoordinatorHandle>,
     pub workspace: Option<Arc<loopal_workspace::WorkspaceService>>,
     pub user_config_dir: Option<PathBuf>,
+    final_sink_redaction_seed: FinalSinkRedactionSeed,
 }
 
 impl Hub {
@@ -70,8 +80,11 @@ impl Hub {
             }
         };
         let spawn_registry = Arc::new(SpawnRegistry::new());
-        let mcp_service =
-            Arc::new(HubMcpService::new().with_spawn_registry(spawn_registry.clone()));
+        let final_sink_redaction_seed = FinalSinkRedactionSeed::new();
+        let mcp_service = Arc::new(
+            HubMcpService::new_with_redaction_seed(final_sink_redaction_seed.clone())
+                .with_spawn_registry(spawn_registry.clone()),
+        );
         let workspace = match loopal_workspace::WorkspaceService::new(&canonical) {
             Ok(service) => Some(service),
             Err(error) => {
@@ -80,14 +93,20 @@ impl Hub {
             }
         };
         Self {
-            registry: AgentRegistry::new(event_tx),
+            registry: AgentRegistry::new_with_redaction_seed(
+                event_tx,
+                final_sink_redaction_seed.clone(),
+            ),
             ui: UiDispatcher::new(),
             uplink: None,
             listener_port: None,
             listener_token: None,
             max_total_agents: 16,
+            max_agent_depth: 2,
             default_cwd: canonical,
+            root_spawn_authority: SpawnAuthority::default(),
             spawn_registry,
+            protected_audit: None,
             vault_service: None,
             mcp_service,
             pending_permissions: HashMap::new(),
@@ -99,10 +118,17 @@ impl Hub {
             remote_views: HashMap::new(),
             pending_interaction_timeout: DEFAULT_INTERACTION_LIFETIME,
             session_permission_grants: HashSet::new(),
+            permission_receipts: PermissionReceiptRegistry::default(),
             shutdown_signal: Arc::new(Notify::new()),
+            workflow_coordinator: None,
             workspace,
             user_config_dir: loopal_config::global_config_dir().ok(),
+            final_sink_redaction_seed,
         }
+    }
+
+    pub fn set_protected_audit(&mut self, audit: Arc<dyn loopal_vault_api::AuditSink>) {
+        self.protected_audit = Some(audit);
     }
 
     pub fn set_vault_service(&mut self, vault: Arc<HubVaultService>) {
@@ -111,6 +137,35 @@ impl Hub {
 
     pub fn set_mcp_service(&mut self, mcp: Arc<HubMcpService>) {
         self.mcp_service = mcp;
+    }
+
+    pub fn final_sink_redaction_seed(&self) -> FinalSinkRedactionSeed {
+        self.final_sink_redaction_seed.clone()
+    }
+
+    pub fn install_workflow_coordinator(&mut self, coordinator: WorkflowCoordinatorHandle) {
+        self.workflow_coordinator = Some(coordinator);
+    }
+
+    pub fn clear_workflow_coordinator(&mut self) {
+        self.workflow_coordinator = None;
+    }
+
+    pub(crate) fn workflow_coordinator(&self) -> Option<WorkflowCoordinatorHandle> {
+        self.workflow_coordinator.clone()
+    }
+
+    pub fn set_root_spawn_authority(&mut self, settings: &loopal_config::Settings) {
+        self.root_spawn_authority = SpawnAuthority {
+            model: settings.model.clone(),
+            permission_mode: settings.permission_mode,
+            decision_mode: settings.decision_mode,
+            sandbox_policy: settings.sandbox.policy,
+        };
+    }
+
+    pub(crate) fn root_spawn_authority(&self) -> SpawnAuthority {
+        self.root_spawn_authority.clone()
     }
 
     pub fn set_pending_interaction_timeout(&mut self, timeout: Duration) {
@@ -143,6 +198,11 @@ impl Hub {
         completion: AgentCompletion,
         envelope: Envelope,
     ) -> bool {
+        let (envelope, completion) = crate::completion_guard::canonicalize_agent_result(
+            envelope,
+            completion,
+            &self.final_sink_redaction_seed,
+        );
         let Some(admission) = self.shadow_spawn_admissions.get_mut(name) else {
             return false;
         };

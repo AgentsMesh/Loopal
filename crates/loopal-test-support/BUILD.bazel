@@ -4,6 +4,7 @@ rust_library(
     name = "loopal-test-support",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
+    proc_macro_deps = ["@crates//:async-trait"],
     visibility = ["//visibility:public"],
     deps = [
         "//crates/loopal-agent",
@@ -15,8 +16,8 @@ rust_library(
         "//crates/loopal-error",
         "//crates/loopal-ipc",
         "//crates/loopal-kernel",
-        "//crates/loopal-provider-api",
         "//crates/loopal-protocol",
+        "//crates/loopal-provider-api",
         "//crates/loopal-runtime",
         "//crates/loopal-scheduler",
         "//crates/loopal-session",
@@ -31,7 +32,26 @@ rust_library(
         "@crates//:tokio",
         "@crates//:tokio-util",
     ],
-    proc_macro_deps = ["@crates//:async-trait"],
+)
+
+rust_library(
+    name = "mock-llm-server",
+    srcs = ["src/mock_llm_server.rs"],
+    crate_name = "loopal_mock_llm_server",
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-mock-llm:loopal-mock-llm-lib",
+        "@crates//:reqwest",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+)
+
+rust_test(
+    name = "mock-llm-server-test",
+    crate = ":mock-llm-server",
+    edition = "2024",
 )
 
 rust_test(

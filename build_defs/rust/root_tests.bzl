@@ -1,6 +1,6 @@
 """Rust tests owned by the root Bazel package."""
 
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("//build_defs/rust:desktop_test.bzl", "desktop_serve_test")
 
 def _binary_e2e(name, src, deps, extra_srcs = [], tags = []):
@@ -87,10 +87,9 @@ def loopal_root_tests():
         ],
         deps = [
             "//crates/loopal-ipc",
-            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
             "//crates/loopal-protocol",
+            "//crates/loopal-test-support:mock-llm-server",
             "@crates//:chrono",
-            "@crates//:reqwest",
             "@crates//:serde_json",
             "@crates//:tempfile",
             "@crates//:tokio",
@@ -103,6 +102,17 @@ def loopal_root_tests():
         edition = "2024",
         deps = ["@crates//:serde_json"],
     )
+    rust_binary(
+        name = "mock_workflow_worker",
+        srcs = ["tests/fixtures/mock_workflow_worker/main.rs"],
+        edition = "2024",
+        deps = [
+            "//crates/loopal-ipc",
+            "//crates/loopal-protocol",
+            "@crates//:serde_json",
+            "@crates//:tokio",
+        ],
+    )
     rust_test(
         name = "hub_llm_e2e_test",
         srcs = native.glob(["tests/e2e/hub_llm/*.rs"]),
@@ -110,11 +120,13 @@ def loopal_root_tests():
         data = [
             ":loopal",
             ":mock_mcp_server",
+            ":mock_workflow_worker",
         ],
         edition = "2024",
         env = {
             "LOOPAL_BINARY": "$(rootpath :loopal)",
             "LOOPAL_MOCK_MCP_BINARY": "$(rootpath :mock_mcp_server)",
+            "LOOPAL_MOCK_WORKFLOW_WORKER_BINARY": "$(rootpath :mock_workflow_worker)",
         },
         local = True,
         tags = [
@@ -124,11 +136,12 @@ def loopal_root_tests():
         ],
         deps = [
             "//crates/loopal-ipc",
-            "//crates/loopal-mock-llm:loopal-mock-llm-lib",
             "//crates/loopal-protocol",
+            "//crates/loopal-storage",
+            "//crates/loopal-test-support:mock-llm-server",
+            "//crates/loopal-turn",
             "//crates/loopal-vault-age",
             "//crates/loopal-vault-api",
-            "@crates//:reqwest",
             "@crates//:secrecy",
             "@crates//:serde_json",
             "@crates//:tempfile",
@@ -140,6 +153,71 @@ def loopal_root_tests():
         name = "loopal-unit-test",
         crate = ":loopal",
         edition = "2024",
+        deps = ["@crates//:tempfile"],
+    )
+
+    # A crate-backed test is required here so rules_rust propagates the real
+    # Rust source and LLVM tools into split coverage post-processing.
+    rust_library(
+        name = "bootstrap_workflow_runtime_coverage",
+        srcs = [
+            "src/bootstrap/hub/typestate/workflow_runtime.rs",
+            "src/bootstrap/hub/typestate/workflow_runtime_tests.rs",
+            "tests/coverage/bootstrap_workflow_runtime.rs",
+        ],
+        crate_root = "tests/coverage/bootstrap_workflow_runtime.rs",
+        edition = "2024",
+        tags = ["manual"],
+        testonly = True,
+        deps = ["@crates//:tokio"],
+    )
+    rust_test(
+        name = "bootstrap_workflow_runtime_coverage_test",
+        crate = ":bootstrap_workflow_runtime_coverage",
+        edition = "2024",
+        tags = ["manual"],
+    )
+    rust_library(
+        name = "bootstrap_start_root_coverage",
+        srcs = [
+            "src/bootstrap/hub/typestate/start_root.rs",
+            "tests/coverage/bootstrap_start_root.rs",
+            "tests/coverage/bootstrap_start_root_boundary.rs",
+            "tests/coverage/bootstrap_start_root_tests.rs",
+        ],
+        crate_root = "tests/coverage/bootstrap_start_root.rs",
+        edition = "2024",
+        tags = ["manual"],
+        testonly = True,
+        deps = ["@crates//:tokio"],
+    )
+    rust_test(
+        name = "bootstrap_start_root_coverage_test",
+        crate = ":bootstrap_start_root_coverage",
+        edition = "2024",
+        tags = ["manual"],
+    )
+    rust_test(
+        name = "bootstrap_lifecycle_test",
+        crate = ":loopal",
+        args = [
+            "--include-ignored",
+            "bootstrap::",
+            "--test-threads=1",
+        ],
+        data = [
+            ":loopal",
+            "tests/fixtures/bootstrap_mock_provider.json",
+        ],
+        edition = "2024",
+        env = {
+            "LOOPAL_BINARY": "$(rootpath :loopal)",
+            "LOOPAL_OTEL_ENABLED": "0",
+            "LOOPAL_TEST_PROVIDER": "$(rootpath tests/fixtures/bootstrap_mock_provider.json)",
+        },
+        local = True,
+        tags = ["exclusive"],
+        deps = ["@crates//:tempfile"],
     )
     rust_test(
         name = "architecture_boundary_test",

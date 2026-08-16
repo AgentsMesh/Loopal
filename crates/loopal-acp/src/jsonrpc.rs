@@ -92,6 +92,11 @@ impl JsonRpcTransport {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) async fn drop_pending_response(&self, id: i64) {
+        self.pending.lock().await.remove(&id);
+    }
+
     async fn write_line(&self, value: &Value) {
         let mut w = self.writer.lock().await;
         if let Ok(bytes) = serde_json::to_vec(value) {

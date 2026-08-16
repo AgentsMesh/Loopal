@@ -9,7 +9,7 @@ use tokio::sync::{Mutex, mpsc};
 
 fn make_hub() -> (Arc<Mutex<Hub>>, mpsc::Receiver<AgentEvent>) {
     let (tx, rx) = mpsc::channel(32);
-    (Arc::new(Mutex::new(Hub::new(tx))), rx)
+    (crate::permission_support::hub_with_noop_audit(tx), rx)
 }
 
 #[tokio::test]
@@ -25,20 +25,16 @@ async fn each_interaction_kind_allows_only_one_active_request_per_agent() {
             agent
                 .send_request(
                     methods::AGENT_PERMISSION.name,
-                    json!({
-                        "tool_call_id": "permission-a", "tool_name": "Bash", "tool_input": {}
-                    }),
+                    crate::permission_request("permission-a", "Bash", json!({})),
                 )
                 .await
         }
     });
-    let permission_token = crate::permission_interaction_id(&hub, "main", "permission-a").await;
+    let permission_interaction = crate::permission_interaction(&hub, "main", "permission-a").await;
     let second_permission = agent
         .send_request(
             methods::AGENT_PERMISSION.name,
-            json!({
-                "tool_call_id": "permission-b", "tool_name": "Read", "tool_input": {}
-            }),
+            crate::permission_request("permission-b", "Read", json!({})),
         )
         .await
         .unwrap();
@@ -93,7 +89,12 @@ async fn each_interaction_kind_allows_only_one_active_request_per_agent() {
         assert_eq!(h.pending_plan_approvals.len(), 1);
     }
     ui.client
-        .respond_permission("main", &permission_token, true)
+        .respond_permission(
+            "main",
+            &permission_interaction.id,
+            Some(permission_interaction.digest),
+            true,
+        )
         .await;
     ui.client
         .respond_question("main", &question_token, vec!["answer".into()])

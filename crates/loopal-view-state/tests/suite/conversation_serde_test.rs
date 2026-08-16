@@ -2,7 +2,7 @@
 //! `ViewSnapshot`. Pinning these guarantees `view/snapshot` carries
 //! enough state for a fresh UI to seed itself end-to-end.
 
-use loopal_protocol::{AgentEventPayload, AgentStatus};
+use loopal_protocol::{AgentEventPayload, AgentStatus, PermissionIntent, PermissionIntentRequest};
 use loopal_view_state::ViewStateReducer;
 
 #[test]
@@ -31,10 +31,22 @@ fn snapshot_round_trips_with_messages_and_streaming() {
 #[test]
 fn snapshot_round_trips_pending_permission_with_relay_id() {
     let mut r = ViewStateReducer::new("main");
+    let request = PermissionIntentRequest::create(
+        "logical-p1",
+        "Bash",
+        serde_json::json!({"command": "ls"}),
+        serde_json::json!({"command": "ls"}),
+        serde_json::json!({"type": "object"}),
+        None,
+    )
+    .unwrap();
+    let intent = PermissionIntent::bind(request.intent_seed, 7, 9, "p1").unwrap();
+    let digest = intent.intent_digest();
     r.apply(AgentEventPayload::ToolPermissionRequest {
         id: "p1".into(),
         name: "Bash".into(),
         input: serde_json::json!({"command": "ls"}),
+        permission_intent: Some(Box::new(intent)),
     });
 
     let json = serde_json::to_string(&r.snapshot()).expect("serialize");
@@ -49,6 +61,7 @@ fn snapshot_round_trips_pending_permission_with_relay_id() {
         .expect("pending_permission preserved");
     assert_eq!(perm.id, "p1");
     assert_eq!(perm.name, "Bash");
+    assert_eq!(perm.intent_digest, Some(digest));
 }
 
 #[test]

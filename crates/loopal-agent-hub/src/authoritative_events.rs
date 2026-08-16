@@ -3,6 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
+use loopal_output_guard::FinalSinkRedactionSeed;
 use loopal_protocol::AgentEvent;
 use tokio::sync::{Notify, mpsc};
 
@@ -14,6 +15,7 @@ use crate::Hub;
 pub(crate) struct AuthoritativeEventSink {
     event_tx: mpsc::Sender<AgentEvent>,
     shutdown_signal: Arc<Notify>,
+    redaction_seed: FinalSinkRedactionSeed,
 }
 
 impl AuthoritativeEventSink {
@@ -21,10 +23,12 @@ impl AuthoritativeEventSink {
         Self {
             event_tx: hub.registry.event_sender(),
             shutdown_signal: hub.shutdown_signal.clone(),
+            redaction_seed: hub.final_sink_redaction_seed(),
         }
     }
 
     pub(crate) fn prepare(&self, event: AgentEvent) -> PreparedAuthoritativeEvent {
+        let event = self.redaction_seed.guard_event(event);
         PreparedAuthoritativeEvent {
             event_tx: self.event_tx.clone(),
             shutdown_signal: self.shutdown_signal.clone(),

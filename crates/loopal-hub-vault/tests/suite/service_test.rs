@@ -91,6 +91,7 @@ fn make_service(identity: Arc<DiscoveredIdentity>) -> HubVaultService {
 
 fn audit_ctx() -> AuditContext {
     AuditContext {
+        session_id: Some("test-session".into()),
         agent_name: "test-agent".into(),
         depth: 0,
         tool_name: None,

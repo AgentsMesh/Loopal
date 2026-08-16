@@ -62,6 +62,9 @@ pub(crate) fn translate_panel(
         AgentEventPayload::ThreadGoalUpdated { goal, .. } => {
             ext_notification(session_id, "goal", serde_json::json!({ "goal": goal }))
         }
+        AgentEventPayload::WorkflowRunChanged(workflow) => {
+            super::ext::workflow_run_changed(session_id, workflow)
+        }
         AgentEventPayload::ModelChanged { model } => {
             ext_notification(session_id, "model", serde_json::json!({ "model": model }))
         }

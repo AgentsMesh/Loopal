@@ -11,10 +11,16 @@ mod forward_timeout_test;
 mod hub_lifecycle_test;
 #[path = "suite/io_lifecycle_test.rs"]
 mod io_lifecycle_test;
+#[path = "suite/nat_roundtrip_test.rs"]
+mod nat_roundtrip_test;
 #[path = "suite/nat_routing_test.rs"]
 mod nat_routing_test;
+#[path = "suite/nat_spawn_completion_test.rs"]
+mod nat_spawn_completion_test;
 #[path = "suite/relay_event_test.rs"]
 mod relay_event_test;
+#[path = "suite/remote_interrupt_test.rs"]
+mod remote_interrupt_test;
 #[path = "suite/remote_relay_test.rs"]
 mod remote_relay_test;
 #[path = "suite/routing_test.rs"]

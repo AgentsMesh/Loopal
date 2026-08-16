@@ -1,4 +1,4 @@
-use loopal_provider_api::ContinuationReason;
+use loopal_provider_api::{ContinuationReason, MessageRole};
 
 use super::llm_result::LlmStreamResult;
 
@@ -26,4 +26,21 @@ pub(super) enum TurnState {
     ToolResultsWritten,
     Cancelled,
     Complete,
+}
+
+impl super::runner::AgentLoopRunner {
+    pub(super) fn has_resumable_turn(&self) -> bool {
+        if self.turns.current_turn_id().is_some() {
+            return true;
+        }
+        // A User projection alone is not pending work: workflow-handled turns
+        // deliberately finish without an Assistant response. Only the loader's
+        // explicit crash marker makes a closed user-tailed turn resumable.
+        matches!(
+            self.turns.store().turns().last().map(|turn| &turn.outcome),
+            Some(loopal_turn::TurnOutcome::Cancelled {
+                cause: loopal_turn::CancelledCause::CrashRecovery
+            })
+        ) && matches!(self.turns.view().last_role(), Some(MessageRole::User))
+    }
 }

@@ -3,14 +3,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Instant;
 
-use loopal_tool_api::{HeadTail, StderrCappedBuffer};
-use parking_lot::Mutex as PlMutex;
+use loopal_backend::ProcessCaptureState;
 use tokio::sync::{mpsc, watch};
 
 use crate::control::{ControlSignal, TaskStatus};
 
-// reason: i32::MIN flags "no exit code yet" — POSIX codes are 0-255 and
-// signal-killed children surface as None, so never collide.
 pub const SENTINEL_NO_EXIT: i32 = i32::MIN;
 
 pub(crate) fn decode_exit_code(raw: i32) -> Option<i32> {
@@ -34,8 +31,7 @@ pub struct BackgroundTask {
     pub(crate) common: TaskCommon,
     pub(crate) control_tx: mpsc::Sender<ControlSignal>,
     pub(crate) log_path: PathBuf,
-    pub(crate) stdout_head_tail: Arc<HeadTail>,
-    pub(crate) stderr_buf: Arc<PlMutex<StderrCappedBuffer>>,
+    pub(crate) capture_state: Arc<ProcessCaptureState>,
 }
 
 impl BackgroundTask {
@@ -76,39 +72,10 @@ impl BackgroundTask {
     }
 
     pub fn render_preview(&self) -> String {
-        format_process_preview(&self.stdout_head_tail, &self.stderr_buf, &self.log_path)
+        self.capture_state.render_preview()
     }
-}
 
-fn format_process_preview(
-    head_tail: &Arc<HeadTail>,
-    stderr_buf: &Arc<PlMutex<StderrCappedBuffer>>,
-    log_path: &Path,
-) -> String {
-    let stdout_preview = head_tail.render_preview();
-    let stdout_truncated = head_tail.was_truncated();
-    let (stderr_content, stderr_truncated) = {
-        let guard = stderr_buf.lock();
-        (guard.snapshot(), guard.was_truncated())
-    };
-
-    let mut out = String::new();
-    out.push_str("[stdout");
-    if stdout_truncated {
-        out.push_str(", truncated");
+    pub fn render_output(&self, wait_timed_out: bool) -> String {
+        self.capture_state.render_output(wait_timed_out)
     }
-    out.push_str("]\n");
-    out.push_str(&stdout_preview);
-    if !stderr_content.is_empty() {
-        out.push_str("\n\n[stderr");
-        if stderr_truncated {
-            out.push_str(", truncated to last 8 KB");
-        }
-        out.push_str("]\n");
-        out.push_str(&stderr_content);
-    }
-    out.push_str("\n\n[full log: ");
-    out.push_str(&log_path.display().to_string());
-    out.push(']');
-    out
 }

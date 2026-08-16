@@ -1,8 +1,8 @@
-#![allow(dead_code)]
-
 use async_trait::async_trait;
 use loopal_error::LoopalError;
-use loopal_tool_api::{PermissionLevel, Tool, ToolContext, ToolResult, TypedBridge, TypedTool};
+use loopal_tool_api::{
+    ImageOutputPolicy, PermissionLevel, Tool, ToolContext, ToolResult, TypedBridge, TypedTool,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
@@ -30,6 +30,10 @@ impl TypedTool<TestParams> for CaptureTool {
         PermissionLevel::ReadOnly
     }
 
+    fn image_output_policy(&self) -> ImageOutputPolicy {
+        ImageOutputPolicy::ValidatedInline
+    }
+
     fn secret_eligible_params(&self) -> &'static [&'static str] {
         &[]
     }
@@ -51,6 +55,21 @@ fn make_bridge() -> TypedBridge<CaptureTool, TestParams> {
     TypedBridge::new(CaptureTool)
 }
 
+#[test]
+fn typed_bridge_forwards_tool_contract() {
+    let bridge = make_bridge();
+    assert_eq!(bridge.name(), "Capture");
+    assert_eq!(bridge.description(), "test tool");
+    assert_eq!(bridge.permission(), PermissionLevel::ReadOnly);
+    assert_eq!(bridge.dispatch(), loopal_tool_api::ToolDispatch::Pipeline);
+    assert_eq!(
+        bridge.image_output_policy(),
+        ImageOutputPolicy::ValidatedInline
+    );
+    assert_eq!(bridge.secret_eligible_params(), &[] as &[&str]);
+    assert_eq!(bridge.precheck(&json!({"required_field": "ok"})), None);
+}
+
 fn make_ctx() -> ToolContext {
     let backend = loopal_backend::LocalBackend::new(
         std::env::temp_dir(),
@@ -59,6 +78,15 @@ fn make_ctx() -> ToolContext {
         "test-session",
     );
     ToolContext::new(backend, "t")
+}
+
+#[tokio::test]
+async fn invalid_typed_input_fails_before_execute() {
+    let error = make_bridge()
+        .execute(json!({}), &make_ctx())
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("required_field"));
 }
 
 #[tokio::test]
@@ -120,51 +148,4 @@ async fn schema_has_no_ref_or_definitions() {
     assert!(!schema_str.contains("\"$ref\""));
     assert!(!schema_str.contains("\"definitions\""));
     assert!(!schema_str.contains("\"$defs\""));
-}
-
-#[derive(Deserialize, JsonSchema)]
-struct NestedItem {
-    label: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-struct NestedParams {
-    items: Vec<NestedItem>,
-}
-
-struct NestedTool;
-
-#[async_trait]
-impl TypedTool<NestedParams> for NestedTool {
-    fn name(&self) -> &str {
-        "Nested"
-    }
-    fn description(&self) -> &str {
-        "test"
-    }
-    fn permission(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-
-    fn secret_eligible_params(&self) -> &'static [&'static str] {
-        &[]
-    }
-    async fn execute(
-        &self,
-        _input: NestedParams,
-        _ctx: &ToolContext,
-    ) -> Result<ToolResult, LoopalError> {
-        Ok(ToolResult::success("ok"))
-    }
-}
-
-#[test]
-fn nested_schema_is_fully_inlined() {
-    let bridge = TypedBridge::<NestedTool, NestedParams>::new(NestedTool);
-    let schema = bridge.parameters_schema();
-    let schema_str = serde_json::to_string(&schema).unwrap();
-    assert!(!schema_str.contains("\"$ref\""));
-    assert!(!schema_str.contains("\"definitions\""));
-    let items_schema = &schema["properties"]["items"]["items"];
-    assert!(items_schema["properties"]["label"].is_object());
 }

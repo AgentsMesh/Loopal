@@ -21,10 +21,14 @@ mod free_text_test;
 mod pending_question_nav_test;
 #[path = "suite/pending_question_test.rs"]
 mod pending_question_test;
+#[path = "suite/permission_projection_test.rs"]
+mod permission_projection_test;
 #[path = "suite/plan_approval_test.rs"]
 mod plan_approval_test;
 #[path = "suite/reducer_aggregate_test.rs"]
 mod reducer_aggregate_test;
+#[path = "suite/reducer_api_test.rs"]
+mod reducer_api_test;
 #[path = "suite/reducer_bg_test.rs"]
 mod reducer_bg_test;
 #[path = "suite/reducer_edge_test.rs"]
@@ -41,6 +45,8 @@ mod reducer_tool_test;
 mod server_tool_format_test;
 #[path = "suite/server_tool_terminal_test.rs"]
 mod server_tool_terminal_test;
+#[path = "suite/thread_goal_projection_test.rs"]
+mod thread_goal_projection_test;
 #[path = "suite/tool_handler_batch_test.rs"]
 mod tool_handler_batch_test;
 #[path = "suite/tool_handler_edge_test.rs"]
@@ -49,3 +55,5 @@ mod tool_handler_edge_test;
 mod tool_handler_stale_test;
 #[path = "suite/turn_end_reconcile_test.rs"]
 mod turn_end_reconcile_test;
+#[path = "suite/workflow_projection_test.rs"]
+mod workflow_projection_test;

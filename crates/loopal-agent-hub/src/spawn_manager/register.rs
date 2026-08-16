@@ -1,17 +1,15 @@
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
-use tracing::{info, warn};
 
 use loopal_ipc::connection::{Connection, Incoming, Listening};
-use loopal_protocol::{AgentEvent, AgentEventPayload, Envelope, QualifiedAddress};
+use loopal_protocol::QualifiedAddress;
+use tokio::sync::{Mutex, mpsc};
 
-use crate::authoritative_events::PreparedAuthoritativeEvent;
 use crate::hub::Hub;
+use crate::types::{AgentOrigin, AgentRuntimeFacts, RegisteredAgent};
 
-use super::completion_bridge::spawn_completion_bridge;
+use super::prepared::{PreparedSpawn, SpawnRequestLease};
+use super::register_exact::{Registration, register};
 
-/// Register a pre-built Connection as a named agent in Hub.
-/// Performs spawn budget check atomically with registration.
 pub async fn register_agent_connection(
     hub: Arc<Mutex<Hub>>,
     name: &str,
@@ -45,152 +43,126 @@ pub async fn register_agent_connection_with_policy(
     session_id: Option<&str>,
     notify_parent_on_completion: bool,
 ) -> Result<String, String> {
-    let agent_id = uuid::Uuid::new_v4().to_string();
+    register_agent_connection_with_execution(
+        hub,
+        name,
+        conn,
+        incoming_rx,
+        parent,
+        model,
+        session_id,
+        notify_parent_on_completion,
+    )
+    .await
+    .map(|registered| registered.agent_id)
+}
 
-    let (completion_tx, completion_rx) = mpsc::channel::<Envelope>(32);
+pub(crate) async fn register_prepared_spawn(
+    hub: Arc<Mutex<Hub>>,
+    prepared: &PreparedSpawn,
+    conn: Arc<Connection<Listening>>,
+    incoming_rx: mpsc::Receiver<Incoming>,
+    session_id: Option<&str>,
+) -> Result<RegisteredAgent, String> {
+    register(
+        hub,
+        conn,
+        incoming_rx,
+        Registration {
+            name: prepared.name.clone(),
+            request_lease: prepared.request_lease.clone(),
+            parent: prepared.parent.clone(),
+            expected_parent: prepared.parent_execution.clone(),
+            model: Some(prepared.authority.model.clone()),
+            session_id: session_id.map(String::from),
+            notify_parent_on_completion: prepared.notify_parent_on_completion,
+            mark_running: false,
+            facts: prepared.runtime_facts(session_id),
+        },
+    )
+    .await
+}
 
-    // String parent comes in qualified-or-bare form depending on caller
-    // (cross-hub spawn provides "hub/agent", local spawn provides "agent").
-    let parent_addr = parent.map(loopal_protocol::QualifiedAddress::parse);
-
-    {
-        let mut h = hub.lock().await;
-
-        // Atomic with registration — no TOCTOU.
-        if parent.is_some() {
-            let sub_count = h.registry.sub_agent_count();
-            if sub_count >= h.max_total_agents as usize {
-                warn!(agent = %name, count = sub_count, "spawn budget exhausted");
-                return Err(format!(
-                    "Spawn budget exhausted ({sub_count}/{} sub-agents). \
-                     Complete the task with your own tools.",
-                    h.max_total_agents
-                ));
-            }
-        }
-
-        if let Some(p) = &parent_addr
-            && p.is_local()
-            && !h.registry.agents.contains_key(&p.agent)
-        {
-            warn!(agent = %name, parent = %p, "parent not found");
-        }
-        if let Err(e) = h.registry.register_connection_with_parent_policy(
-            name,
-            conn.clone(),
-            parent_addr.clone(),
-            model,
-            Some(completion_tx),
-            notify_parent_on_completion,
-        ) {
-            warn!(agent = %name, error = %e, "registration failed");
-            return Err(format!("agent registration failed: {e}"));
-        }
-        h.registry
-            .set_lifecycle(name, crate::AgentLifecycle::Running);
-    }
-    let registered_conn = conn.clone();
-    let (mut delivery, parent_agent, parent_generation) = {
-        let h = hub.lock().await;
-        // Routed to the parent agent so the parent's ViewStateReducer
-        // appends `name` to its `children` field. Parent defaults to
-        // root agent when unspecified (top-level spawn).
-        let parent_agent = parent_addr
-            .as_ref()
-            .map(|p| p.agent.clone())
-            .unwrap_or_else(|| loopal_protocol::ROOT_AGENT_NAME.to_string());
-        let event = AgentEvent::named(
-            QualifiedAddress::local(&parent_agent),
-            AgentEventPayload::SubAgentSpawned(loopal_protocol::SubAgentSpawn {
-                name: name.to_string(),
-                agent_id: agent_id.clone(),
-                parent: parent_addr.clone(),
-                model: model.map(String::from),
-                session_id: session_id.map(String::from),
-            }),
-        );
-        let event = h.registry.prepare_generation_event(&parent_agent, event);
-        (
-            PreparedAuthoritativeEvent::from_hub(&h, event),
-            parent_agent.clone(),
-            h.registry.generation(&parent_agent),
-        )
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn register_agent_connection_with_execution(
+    hub: Arc<Mutex<Hub>>,
+    name: &str,
+    conn: Arc<Connection<Listening>>,
+    incoming_rx: mpsc::Receiver<Incoming>,
+    parent: Option<&str>,
+    model: Option<&str>,
+    session_id: Option<&str>,
+    notify_parent_on_completion: bool,
+) -> Result<RegisteredAgent, String> {
+    let parent = parent.map(QualifiedAddress::parse);
+    let facts = {
+        let locked = hub.lock().await;
+        derive_runtime_facts(&locked, parent.as_ref(), session_id)?
     };
-    let delivery_hub = hub.clone();
-    let delivery_name = name.to_string();
-    let cleanup_conn = registered_conn.clone();
-    let coordinator = tokio::spawn(async move {
-        if let Err(error) = delivery.deliver().await {
-            tracing::error!(
-                agent = %delivery_name,
-                %error,
-                "SubAgentSpawned admission failed; unregistering agent"
-            );
-            let removed = delivery_hub
-                .lock()
-                .await
-                .registry
-                .unregister_connection_if_current(&delivery_name, &cleanup_conn);
-            if removed {
-                let _ =
-                    tokio::time::timeout(std::time::Duration::from_secs(2), cleanup_conn.close())
-                        .await;
-            }
-            return Err(error.to_string());
-        }
-        // Do not let an already-buffered agent/completed overtake the spawn
-        // observation. The completion bridge and IO owner become runnable only
-        // after SubAgentSpawned is durably admitted.
-        let dispatcher =
-            std::sync::Arc::new(crate::dispatch::build_hub_dispatcher(delivery_hub.clone()));
-        let mut locked = delivery_hub.lock().await;
-        if parent_generation.is_some_and(|generation| {
-            !locked
-                .registry
-                .owns_active_generation(&parent_agent, generation)
-        }) {
-            locked
-                .registry
-                .unregister_connection_if_current(&delivery_name, &cleanup_conn);
-            drop(locked);
-            let _ =
-                tokio::time::timeout(std::time::Duration::from_secs(2), cleanup_conn.close()).await;
-            return Err(format!(
-                "parent agent '{parent_agent}' reconnected before spawn admission completed"
-            ));
-        }
-        spawn_completion_bridge(&delivery_name, cleanup_conn.clone(), completion_rx);
-        crate::agent_io::spawn_io_loop(
-            delivery_hub.clone(),
-            dispatcher,
-            &delivery_name,
-            cleanup_conn,
-            incoming_rx,
-        );
-        drop(locked);
-        info!(agent = %delivery_name, "agent registered in Hub");
-        Ok(())
-    });
-    match coordinator.await {
-        Ok(result) => result?,
-        Err(error) => {
-            hub.lock().await.shutdown_signal.notify_one();
-            let removed = hub
-                .lock()
-                .await
-                .registry
-                .unregister_connection_if_current(name, &registered_conn);
-            if removed {
-                let _ = tokio::time::timeout(
-                    std::time::Duration::from_secs(2),
-                    registered_conn.close(),
-                )
-                .await;
-            }
-            return Err(format!(
-                "SubAgentSpawned admission coordinator failed: {error}"
-            ));
-        }
+    let expected_parent = facts.parent.clone();
+    register(
+        hub,
+        conn,
+        incoming_rx,
+        Registration {
+            name: name.to_string(),
+            request_lease: SpawnRequestLease::Internal,
+            parent,
+            expected_parent,
+            model: model.map(String::from),
+            session_id: session_id.map(String::from),
+            notify_parent_on_completion,
+            mark_running: true,
+            facts,
+        },
+    )
+    .await
+}
+
+fn derive_runtime_facts(
+    hub: &Hub,
+    parent: Option<&QualifiedAddress>,
+    session_id: Option<&str>,
+) -> Result<AgentRuntimeFacts, String> {
+    let Some(parent) = parent else {
+        return Ok(AgentRuntimeFacts {
+            origin: AgentOrigin::ManagedChild,
+            cwd: hub.default_cwd.clone(),
+            root_cwd: hub.default_cwd.clone(),
+            root: loopal_protocol::ROOT_AGENT_NAME.to_string(),
+            parent: None,
+            depth: 1,
+            session_id: session_id.map(String::from),
+            workflow_permission_causation: None,
+            workflow_attempt_capability_digest: None,
+            workflow_completion_result_limit: None,
+            spawn: hub.root_spawn_authority(),
+        });
+    };
+    if !parent.is_local() {
+        return Err("local child registration requires a local parent".into());
     }
-    Ok(agent_id)
+    let parent_execution = hub
+        .registry
+        .current_execution(&parent.agent)
+        .ok_or_else(|| format!("parent agent '{}' is not active", parent.agent))?;
+    let parent_facts = hub
+        .registry
+        .runtime_facts(&parent_execution)
+        .ok_or_else(|| format!("parent agent '{}' has no runtime authority", parent.agent))?;
+    Ok(AgentRuntimeFacts {
+        origin: AgentOrigin::ManagedChild,
+        cwd: parent_facts.cwd.clone(),
+        root_cwd: parent_facts.root_cwd.clone(),
+        root: parent_facts.root.clone(),
+        parent: Some(parent_execution),
+        depth: parent_facts.depth.saturating_add(1),
+        session_id: session_id
+            .map(String::from)
+            .or_else(|| parent_facts.session_id.clone()),
+        workflow_permission_causation: parent_facts.workflow_permission_causation.clone(),
+        workflow_attempt_capability_digest: parent_facts.workflow_attempt_capability_digest,
+        workflow_completion_result_limit: parent_facts.workflow_completion_result_limit,
+        spawn: parent_facts.spawn.clone(),
+    })
 }

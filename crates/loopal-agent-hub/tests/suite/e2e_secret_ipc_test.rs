@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,27 +10,23 @@ use tokio::sync::mpsc;
 
 use super::secret_test_helpers::spawn_hub_dispatch_loop;
 
-fn make_client_and_hub() -> (HubSecretClient, Arc<Mutex<Hub>>) {
+async fn make_client_and_hub() -> (HubSecretClient, Arc<Mutex<Hub>>) {
     let (client_t, hub_t) = duplex_pair();
     let (client_conn, _client_rx) = Connection::new(client_t).into_listening();
     let (hub_conn, hub_rx) = Connection::new(hub_t).into_listening();
 
     let (event_tx, _event_rx) = mpsc::channel(64);
-    let hub = Arc::new(Mutex::new(Hub::new(event_tx)));
-    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "test-client".into());
+    let cwd = std::env::current_dir().unwrap();
+    let hub = Arc::new(Mutex::new(Hub::with_cwd(event_tx, cwd.clone())));
+    spawn_hub_dispatch_loop(hub.clone(), hub_conn, hub_rx, "test-client".into()).await;
 
-    let client = HubSecretClient::new(
-        client_conn,
-        PathBuf::from("/nonexistent-test-cwd"),
-        "test-agent".into(),
-        0,
-    );
+    let client = HubSecretClient::new(client_conn, cwd, "test-client".into(), 0);
     (client, hub)
 }
 
 #[tokio::test]
 async fn vault_not_initialized_returns_structured_error() {
-    let (client, _hub) = make_client_and_hub();
+    let (client, _hub) = make_client_and_hub().await;
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         client.get("api_key", HUB_RPC_BUDGET),
@@ -47,7 +42,7 @@ async fn vault_not_initialized_returns_structured_error() {
 
 #[tokio::test]
 async fn list_names_no_vault_returns_structured_error() {
-    let (client, _hub) = make_client_and_hub();
+    let (client, _hub) = make_client_and_hub().await;
     let result = tokio::time::timeout(Duration::from_secs(5), client.list_names(HUB_RPC_BUDGET))
         .await
         .expect("IPC must not hang")

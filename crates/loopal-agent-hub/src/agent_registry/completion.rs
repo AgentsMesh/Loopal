@@ -11,6 +11,10 @@ use tokio::sync::{mpsc, watch};
 use super::AgentRegistry;
 use crate::topology::AgentLifecycle;
 
+#[cfg(test)]
+#[path = "completion_guard_tests.rs"]
+mod completion_guard_tests;
+
 /// Completion side effects that must leave the Hub lock before delivery.
 ///
 /// Completion state and watcher notification are committed synchronously in
@@ -62,128 +66,8 @@ impl PendingCompletionDelivery {
 }
 
 #[cfg(test)]
-#[allow(clippy::items_after_test_module)]
-mod tests {
-    use std::time::Duration;
-
-    use loopal_ipc::connection::Connection;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn cancelled_backpressure_retains_the_ordered_terminal_sequence() {
-        let (event_tx, mut event_rx) = mpsc::channel(1);
-        event_tx
-            .send(AgentEvent::root(AgentEventPayload::Running))
-            .await
-            .unwrap();
-        let mut registry = AgentRegistry::new(event_tx);
-        let mut pending = registry.emit_agent_completion(
-            "worker",
-            AgentCompletion::new("error", Some("provider failed".into())),
-        );
-
-        assert!(
-            tokio::time::timeout(Duration::from_millis(10), pending.deliver_events())
-                .await
-                .is_err(),
-            "full event queue should backpressure completion delivery"
-        );
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Running
-        ));
-
-        let delivery = pending.deliver_events();
-        let receive = async {
-            let error = event_rx.recv().await.unwrap();
-            let finished = event_rx.recv().await.unwrap();
-            (error, finished)
-        };
-        let (result, (error, finished)) = tokio::join!(delivery, receive);
-        result.unwrap();
-        assert!(matches!(
-            error.payload,
-            AgentEventPayload::Error { ref message } if message == "provider failed"
-        ));
-        assert!(matches!(finished.payload, AgentEventPayload::Finished));
-        assert_eq!(error.routing_generation, finished.routing_generation);
-    }
-
-    #[tokio::test]
-    async fn old_child_completion_cannot_reach_same_name_reconnected_parent() {
-        let (event_tx, mut event_rx) = mpsc::channel(8);
-        let mut registry = AgentRegistry::new(event_tx);
-        let (_old_parent_peer, old_parent_transport) = loopal_ipc::duplex_pair();
-        let (old_parent, _old_parent_incoming) =
-            Connection::new(old_parent_transport).into_listening();
-        let (old_completion_tx, _old_completion_rx) = mpsc::channel(1);
-        registry
-            .register_connection_with_parent(
-                "parent",
-                old_parent,
-                None,
-                None,
-                Some(old_completion_tx),
-            )
-            .unwrap();
-        let old_parent_generation = registry.generation("parent").unwrap();
-
-        let (_child_peer, child_transport) = loopal_ipc::duplex_pair();
-        let (child, _child_incoming) = Connection::new(child_transport).into_listening();
-        registry
-            .register_connection_with_parent(
-                "child",
-                child,
-                Some(QualifiedAddress::local("parent")),
-                None,
-                None,
-            )
-            .unwrap();
-        assert_eq!(
-            registry.agents["child"].parent_generation,
-            Some(old_parent_generation)
-        );
-
-        registry.unregister_connection("parent");
-        let (_new_parent_peer, new_parent_transport) = loopal_ipc::duplex_pair();
-        let (new_parent, _new_parent_incoming) =
-            Connection::new(new_parent_transport).into_listening();
-        let (new_completion_tx, mut new_completion_rx) = mpsc::channel(1);
-        registry
-            .register_connection_with_parent(
-                "parent",
-                new_parent,
-                None,
-                None,
-                Some(new_completion_tx),
-            )
-            .unwrap();
-        assert_ne!(registry.generation("parent"), Some(old_parent_generation));
-
-        let mut pending = registry.emit_agent_completion(
-            "child",
-            AgentCompletion::goal(Some("old child result".into())),
-        );
-        assert!(!pending.has_parent_delivery());
-        assert!(
-            registry
-                .local_parent_generation_for_completion("child")
-                .is_none()
-        );
-        pending.deliver_events().await.unwrap();
-        assert!(matches!(
-            event_rx.recv().await.unwrap().payload,
-            AgentEventPayload::Finished
-        ));
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), new_completion_rx.recv())
-                .await
-                .is_err(),
-            "same-name replacement parent must not receive an older edge's completion"
-        );
-    }
-}
+#[path = "completion_tests.rs"]
+mod tests;
 
 impl AgentRegistry {
     /// Emit Finished event, cache typed completion, deliver it, and notify watchers.
@@ -204,6 +88,15 @@ impl AgentRegistry {
         name: &str,
         completion: AgentCompletion,
     ) -> PendingCompletionDelivery {
+        let result_limit = self
+            .current_execution(name)
+            .map(|execution| self.completion_result_limit(&execution))
+            .unwrap_or(loopal_output_guard::MAX_AGENT_COMPLETION_RESULT_BYTES);
+        let completion = crate::completion_guard::guard_with_result_limit(
+            completion,
+            &self.final_sink_redaction_seed,
+            result_limit,
+        );
         if let Some(existing) = self.completion(name) {
             tracing::warn!(
                 agent = %name,
@@ -287,13 +180,7 @@ impl AgentRegistry {
             return None;
         }
         let tx = parent_agent.completion_tx.as_ref()?.clone();
-        // Cap large results: save to overflow file, embed path in envelope.
-        let result = completion.output();
-        let body = if result.len() > MAX_RESULT_BYTES {
-            overflow_agent_result(child_name, result)
-        } else {
-            result.to_string()
-        };
+        let body = completion.output().to_string();
         let delivered_completion = AgentCompletion::new(
             completion.reason.clone(),
             completion.result.as_ref().map(|_| body.clone()),
@@ -349,25 +236,12 @@ impl AgentRegistry {
         rx
     }
 
-    /// Send interrupt to a specific agent.
-    pub async fn interrupt(&self, name: &str) {
-        if let Some(agent) = self.agents.get(name) {
-            match &agent.state {
-                crate::types::AgentConnectionState::Local(ch) => {
-                    ch.interrupt.signal();
-                    ch.interrupt_tx.send_modify(|v| *v = v.wrapping_add(1));
-                }
-                crate::types::AgentConnectionState::Connected(conn) => {
-                    let _ = conn
-                        .send_notification(methods::AGENT_INTERRUPT.name, serde_json::json!({}))
-                        .await;
-                }
-                crate::types::AgentConnectionState::Shadow => {
-                    // Shadow entries represent remote agents — can't interrupt locally.
-                    tracing::debug!(agent = %name, "skipping interrupt for shadow entry");
-                }
-            }
-        }
+    pub(crate) fn watch_completion_exact(
+        &mut self,
+        execution: &crate::types::AgentExecutionRef,
+    ) -> Option<watch::Receiver<Option<AgentCompletion>>> {
+        self.owns_lease(execution)
+            .then(|| self.watch_completion(&execution.address.agent))
     }
 
     pub(crate) fn collect_orphaned_children(&self, parent: &str) -> Vec<String> {
@@ -406,35 +280,4 @@ impl AgentRegistry {
             }
         }
     }
-}
-
-/// Max agent result bytes before overflow to file (100 KB).
-const MAX_RESULT_BYTES: usize = 100_000;
-
-/// Save oversized agent result to file, return preview + path.
-fn overflow_agent_result(agent_name: &str, result: &str) -> String {
-    let dir = std::env::temp_dir().join("loopal").join("overflow");
-    let _ = std::fs::create_dir_all(&dir);
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let path = dir.join(format!("agent_{agent_name}_{ts}.txt"));
-    let path_str = path.to_string_lossy().into_owned();
-    if std::fs::write(&path, result).is_err() {
-        return result[..MAX_RESULT_BYTES].to_string();
-    }
-    // Preview: first ~25 KB
-    let preview_end = result
-        .char_indices()
-        .take_while(|(i, _)| *i < MAX_RESULT_BYTES / 4)
-        .last()
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
-    let kb = result.len() / 1024;
-    format!(
-        "{}\n\n[Agent result too large for context ({kb} KB). Full output saved to: {path_str}]\n\
-         Use the Read tool to access the complete output if needed.",
-        &result[..preview_end]
-    )
 }

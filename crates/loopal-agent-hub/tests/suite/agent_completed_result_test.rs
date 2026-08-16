@@ -20,12 +20,18 @@ type IoHandle = tokio::task::JoinHandle<AgentCompletion>;
 /// Set up a Hub + duplex connection + spawn agent_io_loop. Returns the
 /// client-side connection (to send notifications) and the io_loop join handle.
 async fn setup_agent(name: &str) -> (Arc<Connection<Listening>>, IoHandle) {
-    let (tx, _rx) = mpsc::channel::<AgentEvent>(64);
+    let (tx, mut event_rx) = mpsc::channel::<AgentEvent>(64);
+    tokio::spawn(async move { while event_rx.recv().await.is_some() {} });
     let hub = Arc::new(Mutex::new(Hub::new(tx)));
     let (agent_side, hub_side) = loopal_ipc::duplex_pair();
     let (agent_conn, _agent_rx) = Connection::new(agent_side).into_listening();
     let (hub_conn, hub_rx) = Connection::new(hub_side).into_listening();
 
+    hub.lock()
+        .await
+        .registry
+        .register_connection(name, hub_conn.clone())
+        .unwrap();
     let hc = hub_conn.clone();
     let n = name.to_string();
     let dispatcher = Arc::new(loopal_agent_hub::dispatch::build_hub_dispatcher(

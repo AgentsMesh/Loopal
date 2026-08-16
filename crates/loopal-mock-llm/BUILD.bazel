@@ -31,7 +31,12 @@ rust_binary(
 
 rust_test(
     name = "loopal-mock-llm_test",
-    srcs = ["tests/suite.rs"],
+    srcs = [
+        "tests/metadata_suite.rs",
+        "tests/mutation_suite.rs",
+        "tests/suite.rs",
+    ],
+    crate_root = "tests/suite.rs",
     edition = "2024",
     deps = [
         ":loopal-mock-llm-lib",

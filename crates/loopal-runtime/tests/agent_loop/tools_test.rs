@@ -159,3 +159,32 @@ async fn test_execute_tools_read_allowed_write_denied_in_supervised() {
 
     let _ = std::fs::remove_file(&tmp);
 }
+
+#[tokio::test]
+async fn unknown_tool_becomes_model_visible_error_result() {
+    let (mut runner, mut event_rx, _mbox_tx, _ctrl_tx, _perm_tx) = make_runner_with_channels();
+    runner.params.config.permission_mode = PermissionMode::Bypass;
+    let mut turn_ctx = make_turn_ctx();
+    let stats = in_turn(runner.execute_tools(
+        &mut turn_ctx,
+        vec![(
+            "missing-1".into(),
+            "MissingTool".into(),
+            serde_json::json!({}),
+        )],
+        loopal_runtime::agent_loop::StreamingToolHandle::empty(),
+    ))
+    .await
+    .unwrap();
+
+    assert_eq!((stats.approved, stats.denied, stats.errors), (0, 1, 1));
+    let expected = "Tool error: Tool not found: MissingTool";
+    assert!(matches!(
+        &runner.turns.view().messages()[0].content[0],
+        ContentBlock::ToolResult { content, is_error: true, .. } if content == expected
+    ));
+    assert!(matches!(
+        event_rx.recv().await.unwrap().payload,
+        AgentEventPayload::ToolResult { result, is_error: true, .. } if result == expected
+    ));
+}

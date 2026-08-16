@@ -109,6 +109,18 @@ pub enum StorageError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
+    #[error("Invalid storage path component '{field}': {value}")]
+    InvalidPathComponent { field: &'static str, value: String },
+
+    #[error("Invalid resource identifier")]
+    InvalidResourceId,
+
+    #[error("Resource exceeds the {max_bytes}-byte read limit")]
+    ResourceByteLimitExceeded { max_bytes: usize },
+
+    #[error("Resource content integrity check failed")]
+    ResourceIntegrity,
+
     #[error("Could not determine home directory")]
     HomeDirNotFound,
 }

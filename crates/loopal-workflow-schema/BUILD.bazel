@@ -1,0 +1,27 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "loopal-workflow-schema",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//crates/loopal-protocol",
+        "@crates//:jsonschema",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+    ],
+)
+
+rust_test(
+    name = "loopal-workflow-schema_test",
+    srcs = glob(["tests/**/*.rs"]),
+    compile_data = glob(["src/**/*.rs"]),
+    crate_root = "tests/suite.rs",
+    edition = "2024",
+    deps = [
+        ":loopal-workflow-schema",
+        "//crates/loopal-protocol",
+        "@crates//:serde_json",
+    ],
+)

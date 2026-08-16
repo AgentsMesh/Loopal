@@ -62,6 +62,8 @@ async fn shutdown_request_ack_is_sent_after_signal_and_exits_forward_loop() {
         agent_task,
         lifecycle: loopal_runtime::LifecycleMode::Persistent,
         shutdown: shutdown.clone(),
+        redaction_seed: loopal_output_guard::FinalSinkRedactionSeed::new(),
+        completion_result_limit: loopal_output_guard::MAX_AGENT_COMPLETION_RESULT_BYTES,
     };
 
     let interrupt_at_ack = interrupt.clone();

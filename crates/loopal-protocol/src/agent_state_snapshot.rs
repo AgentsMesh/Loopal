@@ -15,6 +15,7 @@ use crate::bg_task::BgTaskSnapshot;
 use crate::cron_snapshot::CronJobSnapshot;
 use crate::task_snapshot::TaskSnapshot;
 use crate::thread_goal::ThreadGoal;
+use crate::workflow::WorkflowRunsSnapshot;
 
 /// Complete observable state of a single agent process.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +28,10 @@ pub struct AgentStateSnapshot {
     /// render the goal indicator without waiting for the next mutation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_goal: Option<ThreadGoal>,
+    /// Hub-owned workflow summaries for root-agent projection rebuilds.
+    /// Empty on agents that do not own a workflow coordinator.
+    #[serde(default, skip_serializing_if = "WorkflowRunsSnapshot::is_empty")]
+    pub workflows: WorkflowRunsSnapshot,
 }
 
 impl AgentStateSnapshot {
@@ -36,6 +41,7 @@ impl AgentStateSnapshot {
             crons: Vec::new(),
             bg_tasks: Vec::new(),
             thread_goal: None,
+            workflows: WorkflowRunsSnapshot::default(),
         }
     }
 }

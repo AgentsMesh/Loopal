@@ -6,7 +6,7 @@
 //! `hub/question_response` through `HubClient`.
 
 use agent_client_protocol_schema::StopReason;
-use loopal_protocol::{AgentEvent, AgentEventPayload};
+use loopal_protocol::{AgentEvent, AgentEventPayload, ROOT_AGENT_NAME};
 use tracing::warn;
 
 use crate::adapter::AcpAdapter;
@@ -27,17 +27,28 @@ impl AcpAdapter {
                     return StopReason::EndTurn;
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    warn!(skipped = n, "event receiver lagged");
+                    warn!(
+                        skipped = n,
+                        "event receiver lagged; resyncing root snapshot"
+                    );
+                    self.replay_loopal_snapshot(session_id).await;
                 }
             }
         }
     }
 
     async fn handle_event(&self, event: &AgentEvent, session_id: &str) -> Option<StopReason> {
+        let root_event = is_local_root_event(event);
         match &event.payload {
-            AgentEventPayload::AwaitingInput => return Some(StopReason::EndTurn),
-            AgentEventPayload::Finished => return Some(StopReason::EndTurn),
-            AgentEventPayload::ToolPermissionRequest { id, name, input } => {
+            AgentEventPayload::AwaitingInput | AgentEventPayload::Finished if root_event => {
+                return Some(StopReason::EndTurn);
+            }
+            AgentEventPayload::ToolPermissionRequest {
+                id,
+                name,
+                input,
+                permission_intent,
+            } => {
                 let agent_name = event
                     .agent_name
                     .as_ref()
@@ -48,6 +59,9 @@ impl AcpAdapter {
                     id.clone(),
                     name.clone(),
                     input.clone(),
+                    permission_intent
+                        .as_deref()
+                        .map(loopal_protocol::PermissionIntent::intent_digest),
                     session_id,
                 )
                 .await;
@@ -64,6 +78,9 @@ impl AcpAdapter {
                 return None;
             }
             _ => {}
+        }
+        if !root_event {
+            return None;
         }
         if let Some(notif) = translate_event(&event.payload, session_id) {
             match notif {
@@ -99,7 +116,7 @@ impl AcpAdapter {
                     if matches!(
                         event.payload,
                         AgentEventPayload::AwaitingInput | AgentEventPayload::Finished
-                    ) =>
+                    ) && is_local_root_event(&event) =>
                 {
                     return;
                 }
@@ -109,3 +126,14 @@ impl AcpAdapter {
         }
     }
 }
+
+fn is_local_root_event(event: &AgentEvent) -> bool {
+    event
+        .agent_name
+        .as_ref()
+        .is_none_or(|address| address.is_local() && address.agent == ROOT_AGENT_NAME)
+}
+
+#[cfg(test)]
+#[path = "events/tests.rs"]
+mod tests;

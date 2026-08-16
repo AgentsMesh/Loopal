@@ -83,8 +83,10 @@ fn set_no_follow(options: &mut fs::OpenOptions) {
 
 #[cfg(windows)]
 fn set_no_follow(options: &mut fs::OpenOptions) {
-    use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
-    options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+    };
+    options.custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT);
 }
 
 #[cfg(not(any(unix, windows)))]

@@ -16,12 +16,10 @@ fn assert_corruption<T>(result: Result<T, WorkflowJournalError>) {
 }
 
 fn junction(target: &std::path::Path, link: &std::path::Path) {
+    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), target.display());
     let status = std::process::Command::new("cmd")
         .arg("/C")
-        .arg("mklink")
-        .arg("/J")
-        .arg(link)
-        .arg(target)
+        .arg(command)
         .status()
         .unwrap();
     assert!(status.success());

@@ -95,11 +95,11 @@ fn retryable_replace_error(_error: &std::io::Error) -> bool {
     false
 }
 
-fn retryable_verification_error(error: &StorageError) -> bool {
+pub(super) fn retryable_verification_error(error: &StorageError) -> bool {
     matches!(error, StorageError::Io(error) if retryable_replace_error(error))
 }
 
-fn replace_retry_delay(retry: usize) -> std::time::Duration {
+pub(super) fn replace_retry_delay(retry: usize) -> std::time::Duration {
     let shift = u32::try_from(retry.min(5)).unwrap_or(5);
     std::time::Duration::from_millis(1u64 << shift)
 }

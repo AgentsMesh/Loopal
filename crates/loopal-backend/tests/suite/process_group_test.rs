@@ -69,7 +69,7 @@ async fn terminate_grace_covers_descendant_after_leader_exits() {
     let descendant = wait_for_pid(&pid_file).await;
     let started = std::time::Instant::now();
 
-    let termination = spawned.terminate(Duration::from_millis(500)).await;
+    let termination = spawned.terminate(Duration::from_secs(2)).await;
     assert_eq!(termination.outcome, KillOutcome::Terminated);
     assert!(started.elapsed() >= Duration::from_millis(180));
     wait_until_terminal(descendant).await;

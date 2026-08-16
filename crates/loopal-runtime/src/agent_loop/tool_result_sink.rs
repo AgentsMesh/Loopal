@@ -100,7 +100,11 @@ impl PendingToolResult {
         };
         let mut images = std::mem::take(&mut self.result.images);
         if !images.is_empty()
-            && let Some(store) = crate::hydrate::resource_store()
+            && let Some(store) = runner
+                .params
+                .resource_store
+                .clone()
+                .or_else(crate::hydrate::resource_store)
             && crate::hydrate::maybe_persist_inline_images(
                 store.as_ref(),
                 &runner.tool_ctx.session_id,

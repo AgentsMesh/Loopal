@@ -6,9 +6,14 @@ use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::audit::{JsonlAuditSink, RuntimeOp, default_telemetry_dir};
+use crate::audit::{JsonlAuditSink, RuntimeOp};
 use crate::redactor::Redactor;
 use crate::resolver::{collect_wire_refs, resolve_in_value};
+
+mod audit;
+
+use audit::{record_audit, record_redaction_hits_inner};
+pub use audit::{record_redaction_hits, record_redaction_hits_with_audit};
 
 pub async fn apply_resolver(
     tool_name: &str,
@@ -16,6 +21,44 @@ pub async fn apply_resolver(
     whitelist: &[&str],
     client: Option<&Arc<dyn SecretClient>>,
     session_id: &str,
+) -> Vec<(String, SecretString)> {
+    apply_resolver_inner(
+        tool_name,
+        effective_input,
+        whitelist,
+        client,
+        session_id,
+        None,
+    )
+    .await
+}
+
+pub async fn apply_resolver_with_audit(
+    tool_name: &str,
+    effective_input: &mut Value,
+    whitelist: &[&str],
+    client: Option<&Arc<dyn SecretClient>>,
+    session_id: &str,
+    audit: &JsonlAuditSink,
+) -> Vec<(String, SecretString)> {
+    apply_resolver_inner(
+        tool_name,
+        effective_input,
+        whitelist,
+        client,
+        session_id,
+        Some(audit),
+    )
+    .await
+}
+
+async fn apply_resolver_inner(
+    tool_name: &str,
+    effective_input: &mut Value,
+    whitelist: &[&str],
+    client: Option<&Arc<dyn SecretClient>>,
+    session_id: &str,
+    audit: Option<&JsonlAuditSink>,
 ) -> Vec<(String, SecretString)> {
     let Some(client) = client else {
         return Vec::new();
@@ -64,6 +107,7 @@ pub async fn apply_resolver(
             session_id: Some(session_id),
             ..AuditMetadata::default()
         },
+        audit,
     );
 
     let leaked = detect_argv_exposure(effective_input, &seed);
@@ -81,6 +125,7 @@ pub async fn apply_resolver(
                 session_id: Some(session_id),
                 ..AuditMetadata::default()
             },
+            audit,
         );
     }
     seed
@@ -124,37 +169,31 @@ pub fn apply_redactor(
     seed: &[(String, SecretString)],
     session_id: &str,
 ) -> String {
+    apply_redactor_inner(tool_name, content, seed, session_id, None)
+}
+
+pub fn apply_redactor_with_audit(
+    tool_name: &str,
+    content: String,
+    seed: &[(String, SecretString)],
+    session_id: &str,
+    audit: &JsonlAuditSink,
+) -> String {
+    apply_redactor_inner(tool_name, content, seed, session_id, Some(audit))
+}
+
+fn apply_redactor_inner(
+    tool_name: &str,
+    content: String,
+    seed: &[(String, SecretString)],
+    session_id: &str,
+    audit: Option<&JsonlAuditSink>,
+) -> String {
     if seed.is_empty() {
         return content;
     }
     let redactor = Redactor::from_pairs(seed);
     let (redacted, hit_names) = redactor.scan_and_redact(&content);
-    record_redaction_hits(tool_name, &hit_names, session_id);
+    record_redaction_hits_inner(tool_name, &hit_names, session_id, audit);
     redacted
-}
-
-pub fn record_redaction_hits(tool_name: &str, hit_names: &[String], session_id: &str) {
-    if hit_names.is_empty() {
-        return;
-    }
-    warn!(tool = tool_name, hit = ?hit_names, "redacted plaintext from tool output");
-    record_audit(
-        RuntimeOp::Redacted,
-        hit_names,
-        &AuditMetadata {
-            session_id: Some(session_id),
-            ..AuditMetadata::default()
-        },
-    );
-}
-
-fn record_audit(op: RuntimeOp, names: &[String], metadata: &AuditMetadata<'_>) {
-    let Some(dir) = default_telemetry_dir() else {
-        warn!("runtime audit directory unavailable");
-        return;
-    };
-    let sink = JsonlAuditSink::new(dir);
-    if let Err(error) = sink.record_runtime(op, names, metadata) {
-        warn!(%error, "runtime protected audit failed");
-    }
 }

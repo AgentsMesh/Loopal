@@ -4,6 +4,8 @@ use loopal_error::StorageError;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 
+const REPLACE_RETRY_LIMIT: usize = 8;
+
 pub(super) async fn existing_matches(path: &Path, expected: &[u8]) -> Result<bool, StorageError> {
     match open_regular_bounded(path, expected.len()).await {
         Ok((file, existing)) if existing == expected => {
@@ -37,8 +39,69 @@ pub(super) async fn enforce_private_permissions(_file: &fs::File) -> std::io::Re
     Ok(())
 }
 
-pub(super) async fn replace_file(temp: &Path, target: &Path) -> std::io::Result<()> {
-    replace_file_inner(temp, target).await
+pub(super) async fn replace_file(
+    temp: &Path,
+    target: &Path,
+    expected: &[u8],
+) -> Result<(), StorageError> {
+    let mut retries = 0usize;
+    loop {
+        let replace_error = match replace_file_inner(temp, target).await {
+            Ok(()) => return Ok(()),
+            Err(error) => error,
+        };
+
+        // A content-addressed writer may have installed the same bytes while
+        // this replace was racing with it, especially on Windows.
+        match existing_matches(target, expected).await {
+            Ok(true) => {
+                if let Err(error) = fs::remove_file(temp).await
+                    && error.kind() != std::io::ErrorKind::NotFound
+                {
+                    return Err(error.into());
+                }
+                return Ok(());
+            }
+            Ok(false) => {}
+            Err(error)
+                if retryable_replace_error(&replace_error)
+                    && retryable_verification_error(&error)
+                    && retries < REPLACE_RETRY_LIMIT => {}
+            Err(error) => return Err(error),
+        }
+
+        if !retryable_replace_error(&replace_error) || retries >= REPLACE_RETRY_LIMIT {
+            return Err(replace_error.into());
+        }
+        retries += 1;
+        tokio::time::sleep(replace_retry_delay(retries)).await;
+    }
+}
+
+#[cfg(windows)]
+fn retryable_replace_error(error: &std::io::Error) -> bool {
+    use windows_sys::Win32::Foundation::{
+        ERROR_ACCESS_DENIED, ERROR_LOCK_VIOLATION, ERROR_SHARING_VIOLATION,
+    };
+
+    matches!(
+        error.raw_os_error().map(|value| value as u32),
+        Some(ERROR_ACCESS_DENIED | ERROR_LOCK_VIOLATION | ERROR_SHARING_VIOLATION)
+    )
+}
+
+#[cfg(not(windows))]
+fn retryable_replace_error(_error: &std::io::Error) -> bool {
+    false
+}
+
+fn retryable_verification_error(error: &StorageError) -> bool {
+    matches!(error, StorageError::Io(error) if retryable_replace_error(error))
+}
+
+fn replace_retry_delay(retry: usize) -> std::time::Duration {
+    let shift = u32::try_from(retry.min(5)).unwrap_or(5);
+    std::time::Duration::from_millis(1u64 << shift)
 }
 
 pub(super) async fn read_regular_bounded(

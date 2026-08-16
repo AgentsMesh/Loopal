@@ -117,12 +117,12 @@ impl ResourceStore for FileResourceStore {
             file.write_all(bytes).await?;
             file.sync_all().await?;
             drop(file);
-            file_io::replace_file(&tmp, &path).await
+            file_io::replace_file(&tmp, &path, bytes).await
         }
         .await;
         if let Err(error) = prepared {
             let _ = fs::remove_file(&tmp).await;
-            return Err(error.into());
+            return Err(error);
         }
         Ok(id)
     }

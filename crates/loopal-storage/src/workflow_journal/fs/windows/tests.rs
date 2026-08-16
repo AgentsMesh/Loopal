@@ -1,5 +1,5 @@
-use super::{OpenMode, open, workflows_directory};
-use crate::workflow_journal::fs::JournalLocation;
+use super::{OpenMode, discover, open, workflows_directory};
+use crate::workflow_journal::fs::{FsError, JournalLocation};
 
 #[test]
 fn open_parent_handles_block_directory_replacement() {
@@ -31,4 +31,19 @@ fn append_handle_is_exclusive_until_released() {
     let reopened = open(&location, OpenMode::AppendExisting)
         .unwrap_or_else(|_| panic!("journal did not reopen after writer release"));
     drop(reopened);
+}
+
+#[test]
+fn discovery_rejects_a_directory_from_its_opened_handle() {
+    let temp = tempfile::tempdir().unwrap();
+    let (_guards, directory) = workflows_directory(temp.path(), "session-one", true)
+        .unwrap_or_else(|_| panic!("workflow directory creation failed"));
+    std::fs::create_dir(directory.join("wrun_directory.jsonl")).unwrap();
+
+    assert!(matches!(
+        discover(temp.path(), "session-one"),
+        Err(FsError::Integrity(
+            "workflow journal is not a private regular file"
+        ))
+    ));
 }

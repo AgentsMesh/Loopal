@@ -44,7 +44,10 @@ rust_test(
 
 rust_test(
     name = "loopal-backend_test",
-    srcs = glob(["tests/**/*.rs"]),
+    srcs = glob(
+        ["tests/**/*.rs"],
+        exclude = ["tests/suite/process_group_windows_test.rs"],
+    ),
     crate_root = "tests/suite.rs",
     edition = "2024",
     proc_macro_deps = ["@crates//:async-trait"],

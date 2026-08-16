@@ -11,29 +11,37 @@ mod support;
 
 #[test]
 fn executable_resolver_obeys_precedence() {
-    let override_path = script("exit 0");
     let explicit = script("exit 0");
     let current = script("exit 0");
     assert_eq!(
-        AgentProcess::select_executable(
-            explicit.to_str().unwrap(),
-            Some(override_path.clone()),
-            Some(current.clone()),
-        ),
-        override_path
-    );
-    assert_eq!(
-        AgentProcess::select_executable(explicit.to_str().unwrap(), None, Some(current.clone())),
+        AgentProcess::select_executable(explicit.to_str().unwrap(), Some(current.clone())),
         explicit
     );
     assert_eq!(
-        AgentProcess::select_executable("loopal", Some(missing_path()), Some(current.clone())),
+        AgentProcess::select_executable("loopal", Some(current.clone())),
         current
     );
     assert_eq!(
-        AgentProcess::select_executable("loopal", Some(missing_path()), None),
+        AgentProcess::select_executable("loopal", None),
         Path::new("loopal")
     );
+}
+
+#[tokio::test]
+async fn invalid_explicit_override_is_an_error() {
+    let _lock = env_lock().await;
+    let old = std::env::var_os("LOOPAL_BINARY");
+    let missing = missing_path();
+    unsafe { std::env::set_var("LOOPAL_BINARY", &missing) };
+
+    let error = AgentProcess::spawn_now(None).err().unwrap().to_string();
+
+    assert!(error.contains("LOOPAL_BINARY"), "{error}");
+    assert!(error.contains(&missing.display().to_string()), "{error}");
+    match old {
+        Some(value) => unsafe { std::env::set_var("LOOPAL_BINARY", value) },
+        None => unsafe { std::env::remove_var("LOOPAL_BINARY") },
+    }
 }
 
 #[tokio::test]

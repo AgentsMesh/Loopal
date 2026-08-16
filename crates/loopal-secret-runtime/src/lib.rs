@@ -8,7 +8,10 @@ pub mod template;
 
 pub use audit::{JsonlAuditSink, RuntimeOp, default_telemetry_dir};
 pub use guard::{SECRET_REJECTION_MESSAGE, WIRE_REF_MARKER, input_contains_secret_ref};
-pub use hooks::{apply_redactor, apply_resolver, detect_argv_exposure, record_redaction_hits};
+pub use hooks::{
+    apply_redactor, apply_redactor_with_audit, apply_resolver, apply_resolver_with_audit,
+    detect_argv_exposure, record_redaction_hits, record_redaction_hits_with_audit,
+};
 pub use merged::MergedVault;
 pub use redactor::Redactor;
 pub use resolver::{ResolverReport, collect_wire_refs, resolve_in_value};

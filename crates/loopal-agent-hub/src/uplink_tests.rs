@@ -100,6 +100,32 @@ async fn reverse_request_and_notification_deliver_to_local_agent() {
 }
 
 #[tokio::test]
+async fn active_reverse_metahub_can_query_topology() {
+    let hub = hub();
+    let ((_agent_peer, _agent_peer_rx), (agent_hub, _agent_hub_rx)) = pair();
+    hub.lock()
+        .await
+        .registry
+        .register_connection("main", agent_hub)
+        .unwrap();
+    let ((reverse, reverse_rx), (meta, _meta_rx)) = pair();
+    hub.lock().await.uplink = Some(Arc::new(HubUplink::new(reverse.clone(), "hub-a".into())));
+    tokio::spawn(handle_reverse_requests(
+        hub,
+        reverse,
+        reverse_rx,
+        "hub-a".into(),
+    ));
+
+    let topology = meta
+        .send_request(methods::HUB_TOPOLOGY.name, serde_json::json!({}))
+        .await
+        .unwrap();
+    assert_eq!(topology["agents"].as_array().unwrap().len(), 1);
+    assert_eq!(topology["agents"][0]["name"], "main");
+}
+
+#[tokio::test]
 async fn reverse_requests_fail_closed_for_invalid_message_and_hub_method() {
     let hub = hub();
     let ((reverse, reverse_rx), (meta, _meta_rx)) = pair();

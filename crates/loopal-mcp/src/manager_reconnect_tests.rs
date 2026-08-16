@@ -41,8 +41,8 @@ async fn connected(tool: &str) -> McpConnection {
 async fn stale_failed_candidate_cannot_remove_successful_generation() {
     let mut manager = McpManager::new();
     let _ = manager.absorb_connections(vec![failed()]);
-    let mut winner = manager.plan_reconnect("server").unwrap().unwrap();
-    let loser = manager.plan_reconnect("server").unwrap().unwrap();
+    let mut winner = manager.plan_reconnect("server", None).unwrap().unwrap();
+    let loser = manager.plan_reconnect("server", None).unwrap().unwrap();
     winner.candidate = connected("winner_tool").await;
 
     let committed = manager.commit_reconnect(winner);
@@ -60,7 +60,7 @@ async fn stale_failed_candidate_cannot_remove_successful_generation() {
 async fn disconnect_generation_rejects_in_flight_successful_candidate() {
     let mut manager = McpManager::new();
     let _ = manager.absorb_connections(vec![failed()]);
-    let mut plan = manager.plan_reconnect("server").unwrap().unwrap();
+    let mut plan = manager.plan_reconnect("server", None).unwrap().unwrap();
     plan.candidate = connected("stale_tool").await;
     manager.connections["server"].disconnect().await;
 
@@ -79,7 +79,7 @@ async fn disconnect_generation_rejects_in_flight_successful_candidate() {
 async fn removed_server_rejects_in_flight_candidate() {
     let mut manager = McpManager::new();
     let _ = manager.absorb_connections(vec![failed()]);
-    let mut plan = manager.plan_reconnect("server").unwrap().unwrap();
+    let mut plan = manager.plan_reconnect("server", None).unwrap().unwrap();
     plan.candidate = connected("orphaned_tool").await;
     manager.connections.shift_remove("server");
 
@@ -91,12 +91,47 @@ async fn removed_server_rejects_in_flight_candidate() {
 }
 
 #[tokio::test]
-async fn open_current_generation_skips_new_plan() {
+async fn open_current_generation_skips_unforced_plan() {
     let mut manager = McpManager::new();
     manager
         .absorb_connections(vec![connected("existing").await])
         .unwrap();
 
-    assert!(manager.plan_reconnect("server").unwrap().is_none());
-    assert!(manager.plan_reconnect("missing").is_err());
+    assert!(manager.plan_reconnect("server", None).unwrap().is_none());
+    assert!(manager.plan_reconnect("missing", None).is_err());
+}
+
+#[tokio::test]
+async fn current_generation_transport_failure_forces_replacement_before_closed_flag() {
+    let mut manager = McpManager::new();
+    manager
+        .absorb_connections(vec![connected("existing").await])
+        .unwrap();
+    let failed_generation = manager.connection_generation("server").unwrap();
+
+    assert!(
+        manager
+            .plan_reconnect("server", Some(&failed_generation))
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn stale_transport_failure_reuses_open_replacement_generation() {
+    let mut manager = McpManager::new();
+    manager
+        .absorb_connections(vec![connected("original").await])
+        .unwrap();
+    let stale_generation = manager.connection_generation("server").unwrap();
+    manager
+        .absorb_connections(vec![connected("replacement").await])
+        .unwrap();
+
+    assert!(
+        manager
+            .plan_reconnect("server", Some(&stale_generation))
+            .unwrap()
+            .is_none()
+    );
 }

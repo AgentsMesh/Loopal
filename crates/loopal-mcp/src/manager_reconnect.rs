@@ -27,12 +27,22 @@ impl ReconnectPlan {
 }
 
 impl McpManager {
-    pub(crate) fn plan_reconnect(&self, server: &str) -> Result<Option<ReconnectPlan>, McpError> {
+    pub(crate) fn connection_generation(&self, server: &str) -> Option<ConnectionGeneration> {
+        self.connections.get(server).map(McpConnection::generation)
+    }
+
+    pub(crate) fn plan_reconnect(
+        &self,
+        server: &str,
+        failed_generation: Option<&ConnectionGeneration>,
+    ) -> Result<Option<ReconnectPlan>, McpError> {
         let current = self
             .connections
             .get(server)
             .ok_or_else(|| McpError::ServerNotFound(server.to_string()))?;
-        if connection_is_open(current) {
+        let current_request_failed =
+            failed_generation.is_some_and(|generation| current.owns_generation(generation));
+        if !current_request_failed && connection_is_open(current) {
             return Ok(None);
         }
         let candidate = McpConnection::new(

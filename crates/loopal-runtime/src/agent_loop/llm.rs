@@ -24,7 +24,12 @@ impl AgentLoopRunner {
         }
 
         let mut chat_params = self.prepare_chat_params(intent)?;
-        if let Some(store) = crate::hydrate::resource_store() {
+        if let Some(store) = self
+            .params
+            .resource_store
+            .clone()
+            .or_else(crate::hydrate::resource_store)
+        {
             crate::hydrate::hydrate_turn_images(
                 &mut chat_params.turns,
                 store.as_ref(),

@@ -151,11 +151,11 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     if cli.parent_only.serve {
-        let test_provider = cli
-            .parent_only
-            .test_provider
-            .clone()
-            .or_else(|| std::env::var("LOOPAL_TEST_PROVIDER").ok());
+        let test_provider = match cli.parent_only.test_provider.clone() {
+            Some(path) => Some(path),
+            None => loopal_agent_client::resolve_runfile_env("LOOPAL_TEST_PROVIDER")?
+                .map(|path| path.to_string_lossy().into_owned()),
+        };
         if let Some(path) = test_provider {
             return loopal_agent_server::run_agent_server_with_mock(&path).await;
         }

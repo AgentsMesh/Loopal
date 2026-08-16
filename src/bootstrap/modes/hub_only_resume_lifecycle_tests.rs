@@ -11,7 +11,7 @@ use super::run;
 #[tokio::test]
 #[ignore = "real-process Bazel coverage producer"]
 async fn hub_only_can_resume_the_session_created_by_an_earlier_run() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create Hub-only resume home");
     let _home = EnvGuard::set("HOME", home.path());
     let project = tempfile::tempdir().expect("create Hub-only resume project");

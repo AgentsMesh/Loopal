@@ -1,4 +1,6 @@
-use super::{create, ensure_private_directory, ensure_private_file};
+use super::create;
+#[cfg(unix)]
+use super::{ensure_private_directory, ensure_private_file};
 
 fn unique_path(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("loopal-{label}-{}", uuid::Uuid::new_v4()))
@@ -14,6 +16,7 @@ async fn create_rejects_an_existing_path() {
     std::fs::remove_file(path).unwrap();
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn private_directory_inspection_fails_for_missing_path() {
     let path = unique_path("missing-log-dir");

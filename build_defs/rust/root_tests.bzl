@@ -12,10 +12,10 @@ def _binary_e2e(name, src, deps, extra_srcs = [], tags = []):
         crate_root = src,
         data = [":loopal"],
         edition = "2024",
-        env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
+        env = {"LOOPAL_BINARY": "$(rlocationpath :loopal)"},
         local = True,
         tags = ["exclusive"] + tags,
-        deps = deps,
+        deps = ["//crates/loopal-agent-client"] + deps,
     )
 
 def loopal_root_tests():
@@ -76,7 +76,7 @@ def loopal_root_tests():
         crate_root = "tests/e2e/cli_llm/suite.rs",
         data = [":loopal"],
         edition = "2024",
-        env = {"LOOPAL_BINARY": "$(rootpath :loopal)"},
+        env = {"LOOPAL_BINARY": "$(rlocationpath :loopal)"},
         local = True,
         # reason: excluded from `//...` wildcards (three-OS CI matrix) and run
         # by the dedicated Agent E2E gate job, mirroring the desktop e2e setup.
@@ -86,6 +86,7 @@ def loopal_root_tests():
             "manual",
         ],
         deps = [
+            "//crates/loopal-agent-client",
             "//crates/loopal-ipc",
             "//crates/loopal-protocol",
             "//crates/loopal-test-support:mock-llm-server",
@@ -124,9 +125,9 @@ def loopal_root_tests():
         ],
         edition = "2024",
         env = {
-            "LOOPAL_BINARY": "$(rootpath :loopal)",
-            "LOOPAL_MOCK_MCP_BINARY": "$(rootpath :mock_mcp_server)",
-            "LOOPAL_MOCK_WORKFLOW_WORKER_BINARY": "$(rootpath :mock_workflow_worker)",
+            "LOOPAL_BINARY": "$(rlocationpath :loopal)",
+            "LOOPAL_MOCK_MCP_BINARY": "$(rlocationpath :mock_mcp_server)",
+            "LOOPAL_MOCK_WORKFLOW_WORKER_BINARY": "$(rlocationpath :mock_workflow_worker)",
         },
         local = True,
         tags = [
@@ -135,6 +136,7 @@ def loopal_root_tests():
             "manual",
         ],
         deps = [
+            "//crates/loopal-agent-client",
             "//crates/loopal-ipc",
             "//crates/loopal-protocol",
             "//crates/loopal-storage",
@@ -211,9 +213,9 @@ def loopal_root_tests():
         ],
         edition = "2024",
         env = {
-            "LOOPAL_BINARY": "$(rootpath :loopal)",
+            "LOOPAL_BINARY": "$(rlocationpath :loopal)",
             "LOOPAL_OTEL_ENABLED": "0",
-            "LOOPAL_TEST_PROVIDER": "$(rootpath tests/fixtures/bootstrap_mock_provider.json)",
+            "LOOPAL_TEST_PROVIDER": "$(rlocationpath tests/fixtures/bootstrap_mock_provider.json)",
         },
         local = True,
         tags = ["exclusive"],

@@ -7,6 +7,7 @@ pub mod bridge;
 mod client;
 mod process;
 mod process_command;
+mod runfiles;
 mod start_params;
 pub(crate) mod stderr_drain;
 
@@ -18,4 +19,5 @@ pub mod test_support {
 pub use bridge::{BridgeHandles, start_bridge};
 pub use client::{AgentClient, AgentClientEvent};
 pub use process::AgentProcess;
+pub use runfiles::{require_runfile_env, resolve_runfile_env};
 pub use start_params::{StartAgentParams, encode};

@@ -74,14 +74,20 @@ fn context() -> ToolContext {
 
 async fn bash_action_at(
     kernel: &Kernel,
-    marker: &str,
+    marker: &std::path::Path,
 ) -> loopal_runtime::tool_action::PreparedToolAction {
+    let command = if cfg!(windows) {
+        format!("echo effect>\"{}\"", marker.display())
+    } else {
+        let marker = marker.to_string_lossy().replace('\'', "'\\''");
+        format!("printf effect > '{marker}'")
+    };
     prepare_tool_action(
         kernel,
         "id",
         "Bash",
         json!({
-            "command": format!("printf effect > {marker}"),
+            "command": command,
             "env": {"TOKEN": "<secret_ref:missing>"}
         }),
     )
@@ -91,38 +97,33 @@ async fn bash_action_at(
     .unwrap()
 }
 
-async fn bash_action(kernel: &Kernel) -> loopal_runtime::tool_action::PreparedToolAction {
-    bash_action_at(kernel, "/tmp/loopal-unresolved-secret-effect").await
-}
-
 #[tokio::test]
 async fn unresolved_wire_ref_fails_closed_but_missing_marker_can_execute() {
-    let path = std::path::Path::new("/tmp/loopal-unresolved-secret-effect");
-    let _ = std::fs::remove_file(path);
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("unresolved-secret-effect");
     let kernel = Kernel::new(Settings::default()).unwrap();
-    let action = bash_action(&kernel).await;
+    let action = bash_action_at(&kernel, &path).await;
     let error = execute_tool(&kernel, action, &context(), &AgentMode::Act)
         .await
         .expect_err("missing secret client must fail closed");
     assert!(error.to_string().contains("secret resolution failed"));
     assert!(!path.exists());
 
-    let action = bash_action(&kernel).await;
+    let action = bash_action_at(&kernel, &path).await;
     let ctx = context().with_secret_client(Arc::new(MissingSecret));
     let result = execute_tool(&kernel, action, &ctx, &AgentMode::Act)
         .await
         .expect("resolved missing-secret marker is safe literal input");
     assert!(!result.is_error);
     assert!(path.exists());
-    let _ = std::fs::remove_file(path);
 }
 
 #[tokio::test]
 async fn denied_secret_resolution_cannot_execute_the_effect() {
-    let path = std::path::Path::new("/tmp/loopal-denied-secret-effect");
-    let _ = std::fs::remove_file(path);
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("denied-secret-effect");
     let kernel = Kernel::new(Settings::default()).unwrap();
-    let action = bash_action_at(&kernel, path.to_str().unwrap()).await;
+    let action = bash_action_at(&kernel, &path).await;
     let ctx = context().with_secret_client(Arc::new(DeniedSecret));
 
     let error = execute_tool(&kernel, action, &ctx, &AgentMode::Act)

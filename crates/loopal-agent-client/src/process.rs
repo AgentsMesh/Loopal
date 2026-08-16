@@ -168,9 +168,11 @@ impl AgentProcess {
     }
 
     fn resolve_executable(name: &str) -> anyhow::Result<PathBuf> {
-        let override_path = std::env::var("LOOPAL_BINARY").ok().map(PathBuf::from);
+        if let Some(path) = crate::resolve_runfile_env("LOOPAL_BINARY")? {
+            return Ok(path);
+        }
         let current = std::env::current_exe().ok();
-        let selected = Self::select_executable(name, override_path, current);
+        let selected = Self::select_executable(name, current);
         if selected.exists() {
             return std::fs::canonicalize(&selected).map_err(|error| {
                 anyhow::anyhow!(
@@ -182,14 +184,7 @@ impl AgentProcess {
         Ok(selected)
     }
 
-    fn select_executable(
-        name: &str,
-        override_path: Option<PathBuf>,
-        current: Option<PathBuf>,
-    ) -> PathBuf {
-        if let Some(path) = override_path.filter(|path| path.exists()) {
-            return path;
-        }
+    fn select_executable(name: &str, current: Option<PathBuf>) -> PathBuf {
         let explicit = PathBuf::from(name);
         if explicit.is_absolute() && explicit.exists() {
             return explicit;

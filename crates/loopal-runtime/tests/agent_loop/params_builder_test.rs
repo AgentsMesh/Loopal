@@ -79,6 +79,7 @@ async fn builder_default_optionals_yield_none_or_empty() {
     assert!(params.message_snapshot.is_none());
     assert!(params.resume_hooks.is_empty());
     assert!(!params.hydrate_initial_history);
+    assert!(params.resource_store.is_none());
 }
 
 #[tokio::test]
@@ -95,6 +96,8 @@ async fn builder_chained_setters_override_defaults() {
         max_output_tokens: 64,
     };
     let hook: Arc<dyn SessionResumeHook> = Arc::new(NoopHook);
+    let resource_store: Arc<dyn loopal_storage::ResourceStore> =
+        loopal_storage::FileResourceStore::with_base_dir(fixture.path().join("resources"));
     let params = AgentLoopParamsBuilder::new(
         AgentConfig::default(),
         deps_for(&fixture),
@@ -104,9 +107,14 @@ async fn builder_chained_setters_override_defaults() {
     )
     .resume_hooks(vec![hook.clone()])
     .hydrate_initial_history(true)
+    .resource_store(resource_store.clone())
     .build();
     assert_eq!(params.resume_hooks.len(), 1);
     assert!(params.hydrate_initial_history);
+    assert!(Arc::ptr_eq(
+        params.resource_store.as_ref().unwrap(),
+        &resource_store
+    ));
 }
 
 #[tokio::test]

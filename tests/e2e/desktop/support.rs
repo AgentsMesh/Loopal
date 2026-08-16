@@ -16,16 +16,7 @@ pub const STARTUP_DEADLINE: Duration = Duration::from_secs(20);
 pub const EXIT_DEADLINE: Duration = Duration::from_secs(8);
 
 fn binary_path() -> std::path::PathBuf {
-    let configured = std::path::PathBuf::from(
-        std::env::var("LOOPAL_BINARY").expect("LOOPAL_BINARY env required"),
-    );
-    if configured.is_absolute() {
-        configured
-    } else {
-        std::env::current_dir()
-            .expect("test current directory")
-            .join(configured)
-    }
+    loopal_agent_client::require_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
 }
 
 pub fn write_mock_fixture() -> tempfile::NamedTempFile {

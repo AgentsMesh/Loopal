@@ -146,6 +146,7 @@ async fn run_child() {
         super::mock_provider::make_runner_with_dyn_provider(Arc::new(HydrationProvider));
     let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap());
     let store = FileResourceStore::with_base_dir(home.join(".loopal"));
+    runner.params.resource_store = Some(store.clone());
     let bytes = b"\x89PNG\r\n\x1a\n";
     let id = store
         .write(&runner.params.session.id, "image/png", bytes)
@@ -163,6 +164,7 @@ async fn run_child() {
 
     let (mut rejected, _event_rx) =
         super::mock_provider::make_runner_with_dyn_provider(Arc::new(HydrationProvider));
+    rejected.params.resource_store = Some(store);
     append_resource_result(&mut rejected, "invalid".into(), 8);
     in_turn(rejected.stream_llm_with(None, &make_cancel()))
         .await

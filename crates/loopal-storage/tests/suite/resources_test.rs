@@ -133,4 +133,10 @@ async fn concurrent_writes_of_same_content_yield_one_file() {
         .await
         .unwrap();
     assert_eq!(read, payload);
+    let resources = dir.path().join("sessions/sess-c/resources");
+    let entries = std::fs::read_dir(resources)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<Vec<_>>();
+    assert_eq!(entries, vec![std::ffi::OsString::from(first)]);
 }

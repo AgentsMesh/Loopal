@@ -22,8 +22,8 @@ const SPAWN_DEADLINE: Duration = Duration::from_secs(20);
 const REGISTER_DEADLINE: Duration = Duration::from_secs(10);
 const TOKEN: &str = "test-token-deadbeef";
 
-fn binary_path() -> String {
-    std::env::var("LOOPAL_BINARY").expect("LOOPAL_BINARY env required")
+fn binary_path() -> std::path::PathBuf {
+    loopal_agent_client::require_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
 }
 
 fn write_mock_provider() -> tempfile::NamedTempFile {

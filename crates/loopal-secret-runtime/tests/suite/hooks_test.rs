@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 use loopal_secret_client::{IpcBudget, SecretClient, SecretError, SecretResult};
 use loopal_secret_runtime::{
-    apply_redactor, apply_resolver, detect_argv_exposure, record_redaction_hits,
+    JsonlAuditSink, apply_redactor, apply_redactor_with_audit, apply_resolver,
+    apply_resolver_with_audit, detect_argv_exposure, record_redaction_hits,
+    record_redaction_hits_with_audit,
 };
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
@@ -48,25 +50,6 @@ fn client() -> Arc<MockClient> {
     })
 }
 
-struct HomeGuard(Option<std::ffi::OsString>);
-
-impl HomeGuard {
-    fn set(path: &std::path::Path) -> Self {
-        let previous = std::env::var_os("HOME");
-        unsafe { std::env::set_var("HOME", path) };
-        Self(previous)
-    }
-}
-
-impl Drop for HomeGuard {
-    fn drop(&mut self) {
-        match self.0.take() {
-            Some(value) => unsafe { std::env::set_var("HOME", value) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
-    }
-}
-
 #[tokio::test]
 async fn resolver_early_returns_preserve_placeholders() {
     let mut input = json!({"command": "<secret_ref:present>"});
@@ -106,7 +89,8 @@ async fn resolver_early_returns_preserve_placeholders() {
 #[tokio::test]
 async fn resolver_and_redactor_keep_plaintext_consumer_scoped() {
     let home = tempfile::tempdir().unwrap();
-    let _home = HomeGuard::set(home.path());
+    let telemetry_dir = home.path().join(".loopal/telemetry");
+    let audit_sink = JsonlAuditSink::new(telemetry_dir.clone());
     let client = client();
     let secret_client: Arc<dyn SecretClient> = client;
     let mut input = json!({
@@ -115,12 +99,13 @@ async fn resolver_and_redactor_keep_plaintext_consumer_scoped() {
         "description": "<secret_ref:present>"
     });
 
-    let seed = apply_resolver(
+    let seed = apply_resolver_with_audit(
         "Bash",
         &mut input,
         &["command", "env"],
         Some(&secret_client),
         "session-1",
+        &audit_sink,
     )
     .await;
 
@@ -135,7 +120,13 @@ async fn resolver_and_redactor_keep_plaintext_consumer_scoped() {
     );
 
     assert_eq!(
-        apply_redactor("Bash", "leaked sk-present".into(), &seed, "session-1"),
+        apply_redactor_with_audit(
+            "Bash",
+            "leaked sk-present".into(),
+            &seed,
+            "session-1",
+            &audit_sink,
+        ),
         "leaked <secret_ref:present>"
     );
     assert_eq!(
@@ -152,10 +143,14 @@ async fn resolver_and_redactor_keep_plaintext_consumer_scoped() {
     assert!(!audit.contains("sk-present"));
     assert!(!audit.contains("env-secret"));
 
-    let telemetry_dir = home.path().join(".loopal/telemetry");
     std::fs::remove_dir_all(&telemetry_dir).unwrap();
     std::fs::write(&telemetry_dir, "not a directory").unwrap();
-    record_redaction_hits("Bash", &[String::from("present")], "session-audit-error");
+    record_redaction_hits_with_audit(
+        "Bash",
+        &[String::from("present")],
+        "session-audit-error",
+        &audit_sink,
+    );
 }
 
 #[tokio::test]

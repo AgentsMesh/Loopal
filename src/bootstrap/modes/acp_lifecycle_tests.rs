@@ -8,7 +8,7 @@ use crate::bootstrap::lifecycle_test_support::{EnvGuard, assert_runtime_fixture,
 #[tokio::test]
 #[ignore = "real-process Bazel coverage producer"]
 async fn acp_entrypoint_owns_a_real_hub_and_agent_lifecycle() {
-    assert_runtime_fixture();
+    let _fixtures = assert_runtime_fixture();
     let home = tempfile::tempdir().expect("create ACP coverage home");
     let _home = EnvGuard::set("HOME", home.path());
     let project = tempfile::tempdir().expect("create ACP coverage project");

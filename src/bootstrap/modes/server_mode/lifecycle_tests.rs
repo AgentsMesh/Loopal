@@ -30,10 +30,7 @@ fn config(root: &std::path::Path) -> loopal_config::ResolvedConfig {
 #[tokio::test]
 #[ignore = "real-process Bazel coverage producer"]
 async fn ephemeral_server_runs_real_agent_and_shuts_down() {
-    for variable in ["LOOPAL_BINARY", "LOOPAL_TEST_PROVIDER"] {
-        let path = std::env::var(variable).unwrap_or_else(|_| panic!("{variable} must be set"));
-        assert!(std::path::Path::new(&path).is_file(), "missing {variable}");
-    }
+    let _fixtures = crate::bootstrap::lifecycle_test_support::assert_runtime_fixture();
 
     let project = tempfile::tempdir().expect("create isolated server project");
     let cli = Cli {

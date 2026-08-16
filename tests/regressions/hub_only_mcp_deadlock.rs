@@ -13,8 +13,8 @@ use tokio::time::timeout;
 
 const HANDSHAKE_BUDGET: Duration = Duration::from_secs(5);
 
-fn binary_path() -> String {
-    std::env::var("LOOPAL_BINARY").expect("LOOPAL_BINARY env required")
+fn binary_path() -> std::path::PathBuf {
+    loopal_agent_client::require_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
 }
 
 fn write_settings_with_unresponsive_mcp(home_dir: &std::path::Path) -> std::io::Result<()> {

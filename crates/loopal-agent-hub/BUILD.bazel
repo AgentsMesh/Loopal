@@ -56,7 +56,7 @@ rust_test(
     crate_root = "tests/suite.rs",
     data = ["//:loopal"],
     edition = "2024",
-    env = {"LOOPAL_BINARY": "$(rootpath //:loopal)"},
+    env = {"LOOPAL_BINARY": "$(rlocationpath //:loopal)"},
     local = True,
     deps = [
         ":loopal-agent-hub",

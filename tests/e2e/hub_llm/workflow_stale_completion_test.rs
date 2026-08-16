@@ -118,9 +118,8 @@ async fn success_reported_after_timeout_interrupt_cannot_win() {
 }
 
 fn install_late_completion_worker(env: &mut HubEnv) {
-    let fixture = std::env::var("LOOPAL_MOCK_WORKFLOW_WORKER_BINARY")
-        .expect("LOOPAL_MOCK_WORKFLOW_WORKER_BINARY env required");
-    let fixture = std::fs::canonicalize(fixture).expect("resolve mock workflow worker");
+    let fixture = loopal_agent_client::require_runfile_env("LOOPAL_MOCK_WORKFLOW_WORKER_BINARY")
+        .expect("resolve LOOPAL_MOCK_WORKFLOW_WORKER_BINARY");
     let path = env.home.path().join("workflow-late-completion-shim");
     let script = format!(
         r#"#!/bin/sh

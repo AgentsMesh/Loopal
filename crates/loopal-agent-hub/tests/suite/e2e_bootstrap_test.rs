@@ -391,10 +391,10 @@ fn parse_missing_plan_path(result: &str) -> std::path::PathBuf {
 /// Find the loopal binary. Checks LOOPAL_BINARY env var first (set by Bazel),
 /// then falls back to Cargo target directory layout.
 fn resolve_loopal_binary() -> String {
-    if let Ok(path) = std::env::var("LOOPAL_BINARY")
-        && std::path::Path::new(&path).exists()
+    if let Some(path) =
+        loopal_agent_client::resolve_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
     {
-        return path;
+        return path.to_string_lossy().into_owned();
     }
     let test_exe = std::env::current_exe().expect("current_exe");
     let target_dir = test_exe

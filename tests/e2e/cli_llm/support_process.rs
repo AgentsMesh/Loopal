@@ -65,9 +65,14 @@ impl Provider {
     }
 }
 
-fn binary_path() -> String {
-    std::env::var("LOOPAL_BINARY")
-        .or_else(|_| std::env::var("CARGO_BIN_EXE_loopal"))
+fn binary_path() -> std::path::PathBuf {
+    if let Some(path) =
+        loopal_agent_client::resolve_runfile_env("LOOPAL_BINARY").expect("resolve LOOPAL_BINARY")
+    {
+        return path;
+    }
+    std::env::var_os("CARGO_BIN_EXE_loopal")
+        .map(std::path::PathBuf::from)
         .expect("set LOOPAL_BINARY or CARGO_BIN_EXE_loopal to the loopal binary")
 }
 
